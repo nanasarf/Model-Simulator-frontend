@@ -1,0 +1,1 @@
+export const marketCapabilities = { bid: 'MARKET_SUBMIT_BID', ask: 'MARKET_SUBMIT_ASK', prediction: 'MARKET_SUBMIT_PREDICTION', buyerInformation: 'MARKET_VIEW_BUYER_INFO', sellerInformation: 'MARKET_VIEW_SELLER_INFO', governmentInformation: 'MARKET_VIEW_GOVERNMENT_INFO' } as const;
