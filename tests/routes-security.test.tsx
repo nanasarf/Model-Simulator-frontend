@@ -6,7 +6,7 @@ import { ApiClient } from '../src/lib/api/client';
 import { AuthSession } from '../src/lib/auth/session';
 import { createQueryClient } from '../src/lib/api/query';
 import { RuntimeProvider } from '../src/app/runtime';
-import { Protected, LoginPage } from '../src/features/auth/pages';
+import { Protected, LoginPage, InstructorRegistrationPage } from '../src/features/auth/pages';
 import { studentSessionService } from '../src/features/sessions/service';
 import { instructorService } from '../src/features/instructor/service';
 import { hasCapability, canPerform, isInstructor } from '../src/lib/permissions';
@@ -28,6 +28,22 @@ describe('protected routes', () => {
     render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter><LoginPage/></MemoryRouter></RuntimeProvider>);
     const user = userEvent.setup(); await user.type(await screen.findByLabelText('Email address'), 'student@example.test'); await user.type(screen.getByLabelText('Password'), 'incorrect'); await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.'); expect(transport).toHaveBeenCalledTimes(1); queries.clear();
+  });
+  it('makes the shared instructor sign-in path explicit', async () => {
+    const api = new ApiClient('', undefined, vi.fn<typeof fetch>()); const auth = new AuthSession(api, vault()); const queries = createQueryClient();
+    render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter><LoginPage/></MemoryRouter></RuntimeProvider>);
+    expect(await screen.findByRole('heading', { name: /student and instructor sign in/i })).toBeVisible();
+    expect(screen.getByText(/teachers and students sign in with their classroom account/i)).toBeVisible();
+    expect(screen.getByRole('complementary', { name: /instructor account access/i })).toHaveTextContent(/use the form above to sign in as an instructor/i);
+    expect(screen.getByRole('link', { name: /register as an instructor/i })).toHaveAttribute('href', '/auth/instructor/register');
+    expect(screen.queryByText('Create a student account')).not.toBeInTheDocument();
+    queries.clear();
+  });
+  it('provides an instructor registration route without inventing self-service provisioning', () => {
+    render(<MemoryRouter><InstructorRegistrationPage/></MemoryRouter>);
+    expect(screen.getByRole('heading', { name: 'Instructor registration' })).toBeVisible();
+    expect(screen.getByText(/self-service instructor registration is not available/i)).toBeVisible();
+    expect(screen.getByRole('link', { name: /continue to instructor sign in/i })).toHaveAttribute('href', '/auth');
   });
 });
 describe('projection security', () => {

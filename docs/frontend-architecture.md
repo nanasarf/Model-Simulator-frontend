@@ -154,3 +154,11 @@ Before accepting the complete milestone against a running backend:
 5. Resolve the backend model/capability/readiness/submission transport gaps and market privacy defect. Only then wire the active-session registry and verify both real model projections.
 
 No full scenario authoring, gameplay controls, economics, analytics dashboards, replay visualizations, projector, LMS, or new backend endpoints are implemented.
+
+## Milestone 2 scenario authoring
+
+The Instructor Scenarios route now hosts the supported scenario-authoring workflow. Backend model discovery and model-specific template endpoints supply the available starting points. Because the backend exposes no scenario/draft or simulation-definition list, the page does not fabricate library rows: instructors open a known owned draft ID and supply a known owned definition ID when creating a draft. This remains an acceptance blocker for a complete discoverable library.
+
+The shared editor owns lifecycle/version presentation, explicit save state, dirty-page protection, validation, preview, publish confirmation, clone/archive actions, and conflict recovery. ShortRunMacro and CompetitiveMarket field editors remain separate modules. Validation and preview are backend-authoritative; publish requires a saved draft and a successful validation report with no blockers. Create/clone use stable logical idempotency operations, while edit/archive/publish send the returned draft version as `expectedVersion`. Published and archived documents are immutable in the UI.
+
+See `docs/frontend-milestone-2-scenario-authoring.md` for editor sections, private-data boundaries, endpoint behavior, and the precise backend gaps.

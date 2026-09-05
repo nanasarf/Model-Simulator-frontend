@@ -27,14 +27,18 @@ export function LoginPage() {
     catch (error) { setError(error); } finally { setPending(false); }
   }
   return <main className="login-layout"><section className="login-intro"><Link className="brand" to="/auth">S<span aria-hidden="true">/</span>P</Link><p className="eyebrow">Simulation Platform</p><h1>A shared space.<br/>A new perspective.</h1><p>Explore decisions, connect ideas, and learn together.</p><div className="orbit" aria-hidden="true"><span/><span/><span/></div></section>
-    <section className="login-form"><p className="eyebrow">Your classroom starts here</p><h2>Welcome back</h2><p>Sign in with your classroom account.</p>
+    <section className="login-form"><p className="eyebrow">Your classroom starts here</p><h2>Student and instructor sign in</h2><p>Teachers and students sign in with their classroom account. Your platform role opens the right workspace automatically.</p>
       {state.status === 'expired' && <p role="status" className="notice">Your session expired. Sign in to return to your workspace.</p>}
       {location.state?.logoutError && <p role="alert" className="notice">You are signed out on this device. Server sign-out could not be confirmed.</p>}
       <form onSubmit={submit} aria-busy={pending}><label htmlFor="email">Email address</label><input id="email" name="email" type="email" autoComplete="username" required autoFocus/>
         <label htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required/>
         <button disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</button></form>
-      {error !== undefined && <ErrorState error={error}/>}<p><Link to="/auth/register">Create a student account</Link></p><p className="muted">For session access, contact your instructor.</p>
+      {error !== undefined && <ErrorState error={error}/>}<aside className="notice instructor-access" aria-label="Instructor account access"><h3>Instructor access</h3><p>Use the form above to sign in as an instructor.</p><Link to="/auth/instructor/register">Register as an instructor</Link></aside><p className="muted"><Link to="/auth/register">Student account registration</Link></p>
     </section></main>;
+}
+
+export function InstructorRegistrationPage() {
+  return <main className="standalone"><p className="eyebrow">Simulation Platform</p><h1>Instructor registration</h1><section className="notice" role="status"><h2>Instructor accounts are platform-provisioned</h2><p>Self-service instructor registration is not available. Contact your platform administrator to create an instructor account, then return here to sign in.</p></section><p><Link to="/auth">Continue to instructor sign in</Link></p><p className="muted">Student accounts use a separate <Link to="/auth/register">registration page</Link>.</p></main>;
 }
 export function RegisterPage() {
   const { auth } = useRuntime(); const [error, setError] = useState<unknown>(); const [pending, setPending] = useState(false); const [created, setCreated] = useState(false);

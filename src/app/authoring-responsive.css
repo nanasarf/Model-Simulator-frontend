@@ -1,0 +1,26 @@
+/* Typed preview tables display server results; horizontal containment protects the page. */
+.table-scroll { max-width: 100%; overflow-x: auto; margin: 1rem 0 1.5rem; }
+.table-scroll table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table-scroll caption { text-align: left; font-weight: 700; margin-bottom: .6rem; }
+.table-scroll th, .table-scroll td { padding: .65rem; border-bottom: 1px solid #dce4de; text-align: right; white-space: nowrap; }
+.table-scroll th:first-child { text-align: left; }
+
+@media (max-width: 900px) {
+  .authoring-layout { grid-template-columns: 1fr; }
+  .step-nav { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .repeat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .columns-2, .step-nav, .repeat-row { grid-template-columns: 1fr; }
+  .editor-panel { padding: 1.2rem; }
+  .step-nav button { min-height: 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .authoring-layout *, .authoring-layout *::before, .authoring-layout *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}

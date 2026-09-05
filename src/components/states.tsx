@@ -2,7 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { ApiProblem } from '../lib/errors/problem';
 export function LoadingState({ label = 'Loading your workspace' }: { label?: string }) { return <div className="state" role="status"><span className="loading-mark" aria-hidden="true"/><h2>{label}</h2><p>Please wait while we recover the latest information.</p></div>; }
 export function BackgroundStatus({ active }: { active: boolean }) { return <span className="background-status" role="status">{active ? 'Updating from server…' : ''}</span>; }
-export function EmptyState({ title, children }: { title: string; children: ReactNode }) { return <section className="state"><h2>{title}</h2><div>{children}</div></section>; }
+export function EmptyState({ title, children }: { title: string; children?: ReactNode }) { return <section className="state"><h2>{title}</h2>{children && <div>{children}</div>}</section>; }
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
   const problem = error instanceof ApiProblem ? error : null;
   const headings: Record<string, string> = { 'not-found': 'Resource unavailable', unauthorized: 'Access denied', unauthenticated: 'Sign in required', concurrency: 'A newer version is available', validation: 'Check your information', publication: 'Scenario is not ready to publish', readiness: 'Readiness requirement not met', idempotency: 'Submission conflict', 'missing-capability': 'This action is unavailable', lifecycle: 'Session state changed', duplicate: 'Already submitted', 'submission-limit': 'Submission limit reached' };

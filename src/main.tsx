@@ -5,5 +5,6 @@ import { createRuntime, RuntimeProvider } from './app/runtime';
 import { AppRoutes } from './app/router';
 import { ErrorBoundary } from './components/states';
 import './app/styles.css';
+import './app/authoring-responsive.css';
 const runtime = createRuntime();
 createRoot(document.getElementById('root')!).render(<StrictMode><ErrorBoundary><RuntimeProvider runtime={runtime}><BrowserRouter><AppRoutes/></BrowserRouter></RuntimeProvider></ErrorBoundary></StrictMode>);
