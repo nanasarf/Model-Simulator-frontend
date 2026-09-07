@@ -2,7 +2,7 @@
 
 ## Status and contract authority
 
-The foundation is implemented, but **the complete milestone acceptance criteria cannot be met by the current backend contract**. In particular, active-session model routing, capability recovery, round-readiness recovery, prior-submission recovery, and automatic session/owned-scenario discovery are blocked by missing transport data/endpoints. No backend files or endpoints were changed. Full gameplay remains out of scope.
+The foundation and scenario discovery integration are implemented. Active-session model routing, capability recovery, round-readiness recovery, and prior-submission recovery remain dependent on the documented runtime transport. Full gameplay remains out of scope.
 
 The supplied workspace file [`frontend-handoff`](../../frontend-handoff) was read completely before implementation. The adjacent backend checkout was inspected at commit `35f885be3069b3cfb25fe8e0d8725cefe8eeedd8`. Where source and handoff differ, the frontend preserves the source transport shape and explicitly records the mismatch below. No economic calculations or client-derived permissions compensate for missing backend information.
 
@@ -47,7 +47,7 @@ Generic session context contains no macro indicators, market prices, private val
 
 `VITE_API_ORIGIN` is an optional backend origin, with no `/api/v1` suffix. The default uses same-origin `/api/v1` and `/hubs/sessions`. Vite proxies these paths to `API_PROXY_TARGET`, defaulting to the backend launch profile's `http://localhost:5070`. Production must serve the built assets with SPA fallback and reverse-proxy these two paths, including WebSocket upgrades. The inspected backend does not configure CORS; same-origin deployment avoids relying on unimplemented cross-origin support. Use HTTPS in production. Do not embed server secrets in `VITE_*` variables.
 
-Requests use `credentials: omit`: the backend uses JSON tokens, not cookies. The transport does not invent ETags, If-Match, refresh cookies, page parameters, trace endpoints, or lifecycle idempotency headers. RFC Problem Details `traceId` is preserved; traceparent/correlation response headers are fallback support references. The backend generates its own `HttpContext.TraceIdentifier`; there is no documented client correlation-header contract to invent.
+Requests use `credentials: omit`: the backend uses JSON tokens, not cookies. The transport does not invent ETags, If-Match, refresh cookies, trace endpoints, or lifecycle idempotency headers. Scenario discovery sends only its documented page/filter parameters. RFC Problem Details `traceId` is preserved; traceparent/correlation response headers are fallback support references. The backend generates its own `HttpContext.TraceIdentifier`; there is no documented client correlation-header contract to invent.
 
 CSV downloads share the authenticated transport and 401 behavior. `saveDownload` creates and revokes a temporary object URL and uses a caller-provided filename because the backend does not provide one.
 
@@ -77,7 +77,7 @@ Student recovery imports only the generic `/state` and `/history` service. Instr
 
 ## Query/cache and recovery
 
-`keys` defines identities for current-user (reserved; auth is an external store), model catalog, scenario lists/detail/readiness, sessions, state/history, consoles, analytics, and replay. There are no calls behind reserved list keys. Authorized keys include user identity. Server data lives in TanStack Query; auth and connection state do not duplicate query data.
+`keys` defines identities for current-user (reserved; auth is an external store), authoring model discovery, instructor definitions, filtered/paged scenario lists, scenario/version metadata, templates, sessions, state/history, consoles, analytics, and replay. Scenario list keys include identity and every backend filter/page input. Server data lives in TanStack Query; auth and connection state do not duplicate query data.
 
 Queries have a 15-second stale time, no automatic retry, and background refetch on window focus. Mutations never retry automatically. SignalR invalidation targets the current user's specific session prefix; it does not refetch the model catalog, other sessions, or scenarios. Active matching queries refetch; inactive matching projections are marked stale.
 
@@ -134,7 +134,7 @@ The shell includes role-aware navigation, current account, sign-out, connection 
 | Action error catalog differs | `Application/Actions/SubmitAction.cs` emits `capability.denied`, `action.phase_denied`, `action.unknown`, `team.forbidden`, `rule.denied` | Normalize implemented capability/phase codes as well as documented codes. Cannot distinguish generic rule failure from submission limit. |
 | Additional readiness failures | `EfClassroomWorkflow` emits `session.not_ready`, `team.not_ready`, `round.not_ready` | Normalize as readiness conflicts. |
 | Action event differs | `EfRuntimeStore.AddSubmissionAsync` publishes `ActionSubmissionStatusChanged`; workflow publishes participant/role/phase-specific names | Subscribe to source-confirmed names in addition to documented events. |
-| Missing lists and self-join are confirmed, not temporary frontend omissions | Handoff §§3, 4, 8 and endpoint inventory | No available/current-session or owned-scenario lists can be populated. No fictional API workaround. |
+| Missing course/classroom/session lists and self-join are confirmed backend gaps | Handoff §§3, 8 and endpoint inventory | Scenario/definition/version/template discovery is now available; no course/classroom/session list or self-join workaround is invented. |
 | OpenAPI/live server unavailable during verification | No listener at the launch-profile localhost:5070 URL | Build and HTTP/hub-fixture tests pass independently. Real authentication, authorization, refresh rotation and WebSocket handshake still require a running configured backend. |
 
 The implementation does not assert that JWT validation or server initialization succeeds in a live environment; those need the smoke test below. Backend responsibilities remain outside this frontend milestone's modification scope.
@@ -157,7 +157,7 @@ No full scenario authoring, gameplay controls, economics, analytics dashboards, 
 
 ## Milestone 2 scenario authoring
 
-The Instructor Scenarios route now hosts the supported scenario-authoring workflow. Backend model discovery and model-specific template endpoints supply the available starting points. Because the backend exposes no scenario/draft or simulation-definition list, the page does not fabricate library rows: instructors open a known owned draft ID and supply a known owned definition ID when creating a draft. This remains an acceptance blocker for a complete discoverable library.
+The Instructor Scenarios route now hosts the supported scenario-authoring workflow. Generic discovery supplies safe model metadata, owned definitions, filtered/paged Draft/Published/Archived collections, immutable published-version metadata, definition-level history, and template metadata. Creation selects an owned definition from discovery; typed model endpoints remain responsible for full template content and draft mutations.
 
 The shared editor owns lifecycle/version presentation, explicit save state, dirty-page protection, validation, preview, publish confirmation, clone/archive actions, and conflict recovery. ShortRunMacro and CompetitiveMarket field editors remain separate modules. Validation and preview are backend-authoritative; publish requires a saved draft and a successful validation report with no blockers. Create/clone use stable logical idempotency operations, while edit/archive/publish send the returned draft version as `expectedVersion`. Published and archived documents are immutable in the UI.
 

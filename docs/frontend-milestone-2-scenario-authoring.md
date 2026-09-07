@@ -1,10 +1,10 @@
 # Frontend Milestone 2: scenario authoring
 
-## Contract scope and known blocker
+## Contract scope and discovery
 
 Scenario authoring follows the backend handoff in `ModelSimulator-backend/docs/frontend-integration-handoff.md`. The requested frontend-local `docs/frontend-integration-handoff.md` is absent. No endpoint was inferred to compensate.
 
-The backend has no scenario, draft, definition, or published-version discovery endpoint. Consequently, a real library divided into Draft, Published, and Archived collections cannot be populated, filtered, sorted, or paginated. The scenario page explains this limitation and lets an instructor open a known owned draft ID. Creation requires a known owned simulation-definition ID. Templates remain fully discoverable. This is an API acceptance blocker, not a frontend empty-state assumption.
+The backend discovery contract now supplies safe authoring models, owned definitions, filtered/paged Draft/Published/Archived collections, immutable published-version metadata, definition-level version history, and template metadata. The frontend does not accept owner IDs or use client-side pseudo-discovery. Creation selects a returned owned simulation definition; model identity is pinned on publication. Typed authoring endpoints remain responsible for full template content and draft mutations.
 
 ## Shared authoring shell
 
