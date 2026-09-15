@@ -16,7 +16,7 @@ export function Shell() {
   return <ConnectionContext.Provider value={setConnection}><a className="skip-link" href="#main">Skip to content</a><div className="app-shell">
     <header className="topbar"><Link className="brand" to="/">S<span aria-hidden="true">/</span>P <span className="brand-name">Simulation Platform</span></Link><div className="account"><span className="identity">{user?.roles.join(' · ')}<small title={user?.id}>Account {user?.id}</small></span><button className="secondary" onClick={logout} disabled={signingOut}>{signingOut ? 'Signing out…' : 'Sign out'}</button></div></header>
     <div className="workspace"><aside className="sidebar"><p className="eyebrow">Workspace</p><nav aria-label="Primary navigation">
-      {isInstructor(user) && <><NavLink end to="/instructor">Instructor home</NavLink><NavLink to="/instructor/scenarios">Scenarios</NavLink><NavLink to="/instructor/sessions">Instructor sessions</NavLink></>}
+      {isInstructor(user) && <><NavLink end to="/instructor">Home</NavLink><NavLink to="/instructor/classrooms">Classrooms</NavLink><NavLink to="/instructor/scenarios">Scenarios</NavLink><NavLink to="/instructor/sessions">Sessions</NavLink></>}
       {hasPlatformRole(user, 'Student') && <><NavLink end to="/student">Student home</NavLink><NavLink to="/student/sessions">My sessions</NavLink></>}
       </nav><div className="sidebar-foot"><ConnectionLabel status={connection}/><p>Learn through experience.</p></div></aside>
       <main id="main" tabIndex={-1}><Outlet/></main></div><footer className="mobile-connection"><ConnectionLabel status={connection}/></footer>

@@ -162,3 +162,8 @@ The Instructor Scenarios route now hosts the supported scenario-authoring workfl
 The shared editor owns lifecycle/version presentation, explicit save state, dirty-page protection, validation, preview, publish confirmation, clone/archive actions, and conflict recovery. ShortRunMacro and CompetitiveMarket field editors remain separate modules. Validation and preview are backend-authoritative; publish requires a saved draft and a successful validation report with no blockers. Create/clone use stable logical idempotency operations, while edit/archive/publish send the returned draft version as `expectedVersion`. Published and archived documents are immutable in the UI.
 
 See `docs/frontend-milestone-2-scenario-authoring.md` for editor sections, private-data boundaries, endpoint behavior, and the precise backend gaps.
+## Runtime setup corrections
+
+Instructor session setup uses the authoritative `GET /api/v1/sessions/{sessionId}/setup` projection, including its `session.version` concurrency token. Correction commands are server-authoritative and require that token: rename (`POST .../teams/{teamId}/rename`), delete (`POST .../teams/{teamId}/delete`), remove (`POST .../teams/{teamId}/members/{studentId}/remove`), move (`POST .../participants/{studentId}/move`), and role unassignment (`POST .../role-assignments/{assignmentId}/unassign`). A stale token returns Problem Details (`concurrency.conflict`); the client refetches setup rather than overwriting newer state.
+
+The ShortRunMacro runtime adapter is resolved only from the frozen `ModelIdentifier` and `ModelVersion` and renders authorized projection values without client-side simulation calculations.

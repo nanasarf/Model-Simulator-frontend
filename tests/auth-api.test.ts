@@ -58,6 +58,25 @@ describe('authentication lifecycle', () => {
     const s = setup([json(tokens()), json(tokens('Student', 'rotated'))]); await s.auth.login({ email: 'a@b.test', password: 'p' });
     const [a, b] = await Promise.all([s.auth.refresh(), s.auth.refresh()]); expect(a).toBe(b); expect(s.transport).toHaveBeenCalledTimes(2);
   });
+  it('serializes concurrent 401 recovery and retries every request with the rotated access token', async () => {
+    const s = setup([
+      json(tokens()),
+      json({}, 401), json({}, 401),
+      json(tokens('Instructor', 'rotated')),
+      json({ items: [] }), json({ items: [] }),
+    ]);
+    await s.auth.login({ email: 'teacher@example.test', password: 'p' });
+    await Promise.all([
+      s.api.json('/api/v1/scenarios?status=Draft'),
+      s.api.json('/api/v1/scenarios?status=Published'),
+    ]);
+    const calls = s.transport.mock.calls;
+    expect(calls.filter(call => call[0] === '/api/v1/auth/refresh')).toHaveLength(1);
+    const retries = calls.filter(call => String(call[0]).includes('/api/v1/scenarios'));
+    expect(retries).toHaveLength(4);
+    expect(retries.slice(2).every(call => new Headers(call[1]?.headers).get('Authorization') === `Bearer ${tokens('Instructor', 'rotated').accessToken}`)).toBe(true);
+    expect(s.auth.snapshot().status).toBe('authenticated');
+  });
   it('logs out with the refresh token and clears local credentials', async () => {
     const s = setup([json(tokens()), new Response(null, { status: 204 })]); await s.auth.login({ email: 'a@b.test', password: 'p' });
     await s.auth.logout(); expect(s.auth.snapshot().status).toBe('anonymous'); expect(s.storage.read()).toBeNull();

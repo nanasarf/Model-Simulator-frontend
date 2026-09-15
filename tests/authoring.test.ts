@@ -3,6 +3,7 @@ import { ApiClient } from '../src/lib/api/client';
 import { macroAuthoring, marketAuthoring } from '../src/features/scenarios/service';
 import { scenarioDiscovery } from '../src/features/scenarios/discovery';
 import type { MacroDraft } from '../src/types/short-run-macro';
+import { courseService } from '../src/features/courses/service';
 import { json } from './helpers';
 it('versioned authoring sends expectedVersion in JSON and refetches after stale-write conflict', async () => {
   const resource: MacroDraft = { document: { id: 'draft-id', simulationDefinitionId: 'definition-id', name: 'Original', status: 'Draft', content: null, version: 5, createdAt: '', updatedAt: '' }, content: { briefing: 'Original', learningObjectives: [], discussionPrompts: [], debriefPrompts: [], startingConditions: { outputIndex: 100, potentialOutputIndex: 100, inflation: 2, unemployment: 5, policyRate: 3, debtToOutput: 55 }, maximumQuarters: 4, roles: [], enabledActions: [], allowedIntensities: [], scheduledShocks: [], teamObjectives: { inflationMinimum: 1, inflationMaximum: 3, unemploymentMaximum: 6, outputGapAbsoluteMaximum: 2, debtToOutputMaximum: 80 }, assessmentDimensions: null } };
@@ -57,5 +58,23 @@ it('discovers definitions, immutable versions, and safe template metadata throug
     '/api/v1/simulation-definitions/models', '/api/v1/simulation-definitions', '/api/v1/scenarios/scenario-id/versions',
     '/api/v1/simulation-definitions/definition-id/scenario-versions', '/api/v1/scenario-versions/version-id',
     '/api/v1/scenario-templates?modelIdentifier=Economics.CompetitiveMarket',
+  ]);
+});
+
+it('uses classroom, setup, and student-session discovery endpoints without local collections', async () => {
+  const transport = vi.fn<typeof fetch>().mockImplementation(async (url) => {
+    const path = String(url);
+    if (path.includes('/classrooms?')) return json({ items: [], page: 1, pageSize: 25, totalCount: 0 });
+    if (path.endsWith('/roster')) return json([]);
+    if (path.endsWith('/setup')) return json({});
+    if (path.includes('/sessions?')) return json({ items: [], page: 1, pageSize: 25, totalCount: 0 });
+    return json([]);
+  });
+  const service = courseService(new ApiClient('', undefined, transport));
+  await service.classrooms(); await service.classroom('classroom-id'); await service.roster('classroom-id');
+  await service.sessions({ classroomId: 'classroom-id', status: 'Draft', modelIdentifier: 'Economics.ShortRunMacro' }); await service.mySessions(); await service.setup('session-id');
+  expect(transport.mock.calls.map(call => call[0])).toEqual([
+    '/api/v1/classrooms?page=1&pageSize=25', '/api/v1/classrooms/classroom-id', '/api/v1/classrooms/classroom-id/roster',
+    '/api/v1/sessions?page=1&pageSize=25&classroomId=classroom-id&status=Draft&modelIdentifier=Economics.ShortRunMacro', '/api/v1/me/sessions', '/api/v1/sessions/session-id/setup',
   ]);
 });

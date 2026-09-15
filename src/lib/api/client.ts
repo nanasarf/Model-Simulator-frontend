@@ -9,8 +9,16 @@ export interface RequestOptions {
   anonymous?: boolean; signal?: AbortSignal; idempotencyKey?: string;
 }
 export class ApiClient {
+  private refreshInFlight: Promise<string> | null = null;
   constructor(readonly origin = '', private credentials?: Credentials, private transport: typeof fetch = (...args) => fetch(...args)) {}
   attach(credentials: Credentials) { this.credentials = credentials; }
+  private refreshOnce() {
+    if (!this.credentials) return Promise.reject(sessionExpired());
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.credentials.refresh().finally(() => { this.refreshInFlight = null; });
+    }
+    return this.refreshInFlight;
+  }
   private async response(path: string, options: RequestOptions): Promise<Response> {
     if (!path.startsWith('/api/v1/')) throw new Error('API requests must use a documented /api/v1/ path.');
     const body = options.serializedBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
@@ -27,7 +35,7 @@ export class ApiClient {
     if (response.status === 401 && !options.anonymous && this.credentials) {
       // Only retry after an explicit 401, never after an ambiguous network/mutation failure.
       const latest = await this.credentials.getAccessToken();
-      token = latest && latest !== token ? latest : await this.credentials.refresh();
+      token = latest && latest !== token ? latest : await this.refreshOnce();
       response = await send();
       if (response.status === 401) this.credentials.invalidate();
     }

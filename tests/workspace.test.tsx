@@ -29,7 +29,7 @@ describe('routed active workspace', () => {
     const api = new ApiClient('', undefined, transport); const auth = new AuthSession(api, vault(tokens())); const queries = createQueryClient();
     const view = render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter initialEntries={[`/simulation/${sessionId}`]}><AppRoutes/></MemoryRouter></RuntimeProvider>);
     expect(await screen.findByText('Decision')).toBeVisible(); expect(screen.getByText('BUYER')).toBeVisible(); expect(screen.getByText(recovery.teamId)).toBeVisible();
-    expect(screen.getByText('Ready')).toBeVisible(); expect(screen.getByText(/server does not yet identify/)).toBeVisible();
+    expect(screen.getByText('Ready')).toBeVisible(); expect(screen.getByText(/Model-specific gameplay controls/)).toBeVisible();
     await waitFor(() => expect(screen.getAllByText('Connected').length).toBeGreaterThan(0));
     latest = { ...recovery, phase: 'Results', roundNumber: 3, version: 13 };
     hub.reconnect(); expect(await screen.findByText('Results')).toBeVisible(); expect(screen.getByText('3')).toBeVisible();
