@@ -22,4 +22,6 @@ export const courseService = (api: ApiClient) => ({
   moveMember: (sessionId: string, userId: string, targetTeamId: string, expectedVersion: number, idempotencyKey?: string) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/participants/${encodeURIComponent(userId)}/move`, { method: 'POST', body: { targetTeamId, expectedVersion }, idempotencyKey }),
   unassignRole: (sessionId: string, assignmentId: string, expectedVersion: number, idempotencyKey?: string) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/role-assignments/${encodeURIComponent(assignmentId)}/unassign`, { method: 'POST', body: { expectedVersion }, idempotencyKey }),
   startSession: (sessionId: string) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/commands/start`, { method: 'POST' }),
+  joinCode: (sessionId: string, signal?: AbortSignal) => api.json<{ sessionId: string; joinCode: string; active: boolean }>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/join-code`, { signal }),
+  joinSession: (code: string) => api.json<{ sessionId: string; participantId: string; teamId: string | null; joinCode: string }>('/api/v1/session-joins', { method: 'POST', body: { code } }),
 });
