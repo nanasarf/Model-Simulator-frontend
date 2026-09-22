@@ -7,6 +7,7 @@ export interface SessionSummary { sessionId: string; classroomId: string; classr
 export interface SessionPage { items: SessionSummary[]; page: number; pageSize: number; totalCount: number }
 export interface StudentSessionSummary { sessionId: string; classroomId: string; classroomName: string; scenarioTitle: string; modelIdentifier: string; modelVersion: string; status: string; currentRound: number; currentPhase: string; teamId: string | null }
 export interface ClassroomDetail extends ClassroomSummary {}
+export interface ClassroomJoinRequest { id: string; classroomId: string; studentUserId: string; status: string; requestedAt: string; version: number }
 export interface SessionSetup {
   session: { id: string; status: string; currentRound: number; currentPhase: string; version: number };
   classroom: { id: string; name: string };

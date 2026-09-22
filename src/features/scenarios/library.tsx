@@ -1,24 +1,804 @@
-import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useAuth, useRuntime } from '../../app/runtime';
-import { BackgroundStatus, EmptyState, ErrorState, LoadingState } from '../../components/states';
-import { keys } from '../../lib/api/query';
-import { scenarioDiscovery } from './discovery';
-import type { ScenarioSummary } from '../../types/discovery';
-import type { MacroScenarioContent } from '../../types/short-run-macro';
-import type { CompetitiveMarketScenarioContent } from '../../types/competitive-market';
-import { blankMacro } from '../short-run-macro/authoring';
-import { blankMarket } from '../competitive-market/authoring';
-import { macroAuthoring, marketAuthoring } from './service';
-import { courseService } from '../courses/service';
-import { Pagination } from '../instructor/classrooms';
+import { useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
+import { useAuth, useRuntime } from "../../app/runtime";
+import {
+  BackgroundStatus,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from "../../components/states";
+import { keys } from "../../lib/api/query";
+import { scenarioDiscovery } from "./discovery";
+import type {
+  AuthoringModelSummary,
+  PublishedScenarioVersionSummary,
+  ScenarioSummary,
+  SimulationDefinitionSummary,
+} from "../../types/discovery";
+import type { MacroScenarioContent } from "../../types/short-run-macro";
+import type { CompetitiveMarketScenarioContent } from "../../types/competitive-market";
+import { blankMacro } from "../short-run-macro/authoring";
+import { blankMarket } from "../competitive-market/authoring";
+import { macroAuthoring, marketAuthoring } from "./service";
+import { courseService } from "../courses/service";
+import { Pagination } from "../instructor/classrooms";
 
-type Model = 'Economics.ShortRunMacro'|'Economics.CompetitiveMarket';
-const modelLabel=(id:string)=>id==='Economics.ShortRunMacro'?'Short-Run Macroeconomics':'Competitive Market';
-export function ScenarioLibraryPage(){const{api}=useRuntime();const{user}=useAuth();const[params,setParams]=useSearchParams();const model=(params.get('model')||'') as Model|'';const search=params.get('search')||'';const page=Math.max(1,Number(params.get('page')||1));const setFilter=(key:string,value:string)=>{const next=new URLSearchParams(params);value?next.set(key,value):next.delete(key);if(key!=='page')next.delete('page');setParams(next)};const load=(status:'Draft'|'Published'|'Archived')=>useQuery({queryKey:keys.scenarioLists(user!.id,status,model,search,page,25),queryFn:({signal})=>scenarioDiscovery(api).scenarios({status,modelIdentifier:model||undefined,search:search||undefined,page,pageSize:25},signal)});const drafts=load('Draft'),published=load('Published'),archived=load('Archived');const models=useQuery({queryKey:['authoring-models'],queryFn:({signal})=>scenarioDiscovery(api).models(signal)});const discoveredModels=models.data?.filter(x=>x.scenarioAuthoringSupported)??[];return <><header className="page-heading"><p className="eyebrow">Instructor workspace</p><h1>Scenario library</h1><p>Discover and manage owned drafts and immutable published versions.</p><Link className="button-link" to="/instructor/scenarios/create">Create scenario</Link></header><section className="card library-filters"><div className="input-row"><label htmlFor="scenario-search">Search title</label><input id="scenario-search" value={search} onChange={e=>setFilter('search',e.target.value)} placeholder="Search scenarios"/><label htmlFor="scenario-model">Model</label><select id="scenario-model" value={model} onChange={e=>setFilter('model',e.target.value)}><option value="">All models</option>{discoveredModels.map(x=><option key={`${x.identifier}:${x.version}`} value={x.identifier}>{x.displayName}</option>)}</select></div><p className="field-help">Filters and paging are applied by the backend.</p></section>{models.isError&&<ErrorState error={models.error}/>}<LibraryGroup title="Drafts" query={drafts} onPage={p=>setFilter('page',String(p))}/><LibraryGroup title="Published" query={published} onPage={p=>setFilter('page',String(p))}/><LibraryGroup title="Archived" query={archived} onPage={p=>setFilter('page',String(p))}/><p className="muted">Archived scenarios are requested explicitly and excluded from default launch-oriented queries.</p></>}
-function LibraryGroup({title,query,onPage}:{title:string;query:ReturnType<typeof useQuery<{items:ScenarioSummary[];page:number;pageSize:number;totalCount:number}>>;onPage:(page:number)=>void}){return <section><div className="section-heading"><h2>{title}</h2><BackgroundStatus active={query.isFetching}/></div>{query.isPending?<LoadingState label={`Loading ${title.toLowerCase()}`}/>:query.isError?<ErrorState error={query.error} retry={()=>void query.refetch()}/>:query.data.items.length===0?<EmptyState title={`No ${title.toLowerCase()} scenarios`}><p>The backend returned no owned scenarios in this lifecycle state.</p></EmptyState>:<><div className="card-grid">{query.data.items.map(s=><ScenarioCard scenario={s} key={s.scenarioId}/>)}</div><Pagination page={query.data.page} pageSize={query.data.pageSize} total={query.data.totalCount} onPage={onPage}/></>}</section>}
-function ScenarioCard({scenario}:{scenario:ScenarioSummary}){return <article className="card scenario-card"><p className="eyebrow">{scenario.lifecycleStatus} · {modelLabel(scenario.modelIdentifier)}</p><h3>{scenario.title}</h3>{scenario.summary&&<p>{scenario.summary}</p>}<dl><div><dt>Model</dt><dd>{scenario.modelIdentifier}:{scenario.modelVersion}</dd></div><div><dt>Version</dt><dd>{scenario.publishedVersionNumber??'Draft'} · v{scenario.concurrencyVersion}</dd></div><div><dt>Updated</dt><dd>{new Date(scenario.updatedAt).toLocaleString()}</dd></div></dl><div className="button-row">{scenario.lifecycleStatus==='Draft'?<Link to={`/instructor/scenarios/${scenario.modelIdentifier.endsWith('ShortRunMacro')?'macro':'market'}/${scenario.draftId}`}>Edit draft</Link>:scenario.publishedVersionId&&<Link to={`/instructor/scenarios/versions/${scenario.publishedVersionId}`}>View immutable version</Link>}{scenario.publishedVersionId&&<Link to={`/instructor/scenarios/${scenario.scenarioId}/versions`}>Version history</Link>}{scenario.launchable?<span className="status-text">Launchable</span>:<span className="muted">{scenario.launchabilityReason}</span>}</div></article>}
-export function ScenarioVersionHistoryPage(){const{api}=useRuntime();const{user}=useAuth();const{scenarioId}=useParams();const id=scenarioId!;const q=useQuery({queryKey:keys.scenarioVersions(user!.id,id),queryFn:({signal})=>scenarioDiscovery(api).versions(id,signal)});if(q.isPending)return <LoadingState label="Loading version history"/>;if(q.isError)return <ErrorState error={q.error} retry={()=>void q.refetch()}/>;return <><header className="page-heading"><p className="eyebrow">Scenario version history</p><h1>Published versions</h1><p>Typed authoring drafts link to at most one published version; definition-level history contains the complete persisted sequence.</p></header>{q.data.length===0?<EmptyState title="No published versions"><p>This scenario has not been published.</p></EmptyState>:<div className="card-grid">{q.data.map(v=><article className="card" key={v.publishedVersionId}><p className="eyebrow">Version {v.scenarioVersionNumber}</p><h2>{v.title}</h2><p>{v.modelIdentifier}:{v.modelVersion}</p><p>Published {new Date(v.publishedAt).toLocaleString()}</p><p>{v.sourceScenarioArchived?'Source scenario archived.':'Source scenario active.'}</p><Link to={`/instructor/scenarios/versions/${v.publishedVersionId}`}>View immutable metadata</Link></article>)}</div>}</>}
-export function PublishedVersionPage(){const{api}=useRuntime();const{user}=useAuth();const navigate=useNavigate();const{versionId}=useParams();const q=useQuery({queryKey:keys.publishedVersion(user!.id,versionId!),queryFn:({signal})=>scenarioDiscovery(api).version(versionId!,signal)});const classrooms=useQuery({queryKey:keys.classrooms(user!.id,1,100),queryFn:({signal})=>courseService(api).classrooms(1,100,signal)});const[chosen,setChosen]=useState('');const launch=useMutation({mutationFn:()=>courseService(api).createSession(chosen,{scenarioVersionId:versionId!,seed:1},crypto.randomUUID()),onSuccess:r=>navigate(`/instructor/sessions/${r.id}/setup`)});if(q.isPending||classrooms.isPending)return <LoadingState label="Loading launch options"/>;if(q.isError)return <ErrorState error={q.error} retry={()=>void q.refetch()}/>;if(classrooms.isError)return <ErrorState error={classrooms.error} retry={()=>void classrooms.refetch()}/>;const v=q.data;return <><header className="page-heading"><p className="eyebrow">Immutable published version</p><h1>{v.title}</h1><p>{v.modelIdentifier}:{v.modelVersion} · Version {v.scenarioVersionNumber}</p></header><section className="card"><dl><div><dt>Published</dt><dd>{new Date(v.publishedAt).toLocaleString()}</dd></div><div><dt>Launchability</dt><dd>{v.launchable?'Launchable':v.launchabilityReason}</dd></div><div><dt>Source status</dt><dd>{v.sourceScenarioArchived?'Archived':'Active'}</dd></div><div><dt>Mutation</dt><dd>Immutable</dd></div></dl><p className="muted">Published artifacts cannot be edited. Clone from the authoring draft to make changes.</p></section>{v.launchable&&<section className="card"><h2>Launch simulation</h2><p>Launch <strong>{v.title}</strong>, published version {v.scenarioVersionNumber}, into an owned classroom.</p><label htmlFor="launch-classroom">Classroom</label><select id="launch-classroom" value={chosen} onChange={e=>setChosen(e.target.value)}><option value="">Select classroom</option>{classrooms.data.items.map(c=><option key={c.classroomId} value={c.classroomId}>{c.name} · {c.courseName}</option>)}</select><button disabled={!chosen||launch.isPending} onClick={()=>launch.mutate()}>{launch.isPending?'Creating session…':'Create session'}</button>{launch.error&&<ErrorState error={launch.error}/>}</section>}</>}
-export function CreateScenarioPage(){const{api}=useRuntime();const navigate=useNavigate();const params=new URLSearchParams(location.search);const[model,setModel]=useState<Model>((params.get('model') as Model)||'Economics.ShortRunMacro');const[name,setName]=useState('');const[definitionId,setDefinitionId]=useState('');const[templateCode,setTemplateCode]=useState(params.get('template')||'');const models=useQuery({queryKey:['authoring-models'],queryFn:({signal})=>scenarioDiscovery(api).models(signal)});const definitions=useQuery({queryKey:['definitions'],queryFn:({signal})=>scenarioDiscovery(api).definitions(signal)});const templates=useQuery({queryKey:['scenario-templates',model],queryFn:({signal})=>scenarioDiscovery(api).templates(model,signal)});const macroContent=useQuery({queryKey:['authoring-content-templates','macro'],queryFn:({signal})=>macroAuthoring(api).templates(signal)});const marketContent=useQuery({queryKey:['authoring-content-templates','market'],queryFn:({signal})=>marketAuthoring(api).templates(signal)});const create=useMutation({mutationFn:async()=>{const metadata=templates.data?.find(x=>x.templateIdentifier===templateCode);if(templateCode&&!metadata)throw new Error('Selected template is no longer available.');const content=model==='Economics.ShortRunMacro'?macroContent.data?.find(x=>x.code===templateCode)?.content??blankMacro():marketContent.data?.find(x=>x.code===templateCode)?.content??blankMarket();if(model==='Economics.ShortRunMacro'){const s=macroAuthoring(api);return{model:'macro',draft:await s.create(s.prepareCreate({simulationDefinitionId:definitionId,name,content:content as MacroScenarioContent}))}}const s=marketAuthoring(api);return{model:'market',draft:await s.create(s.prepareCreate({simulationDefinitionId:definitionId,name,content:content as CompetitiveMarketScenarioContent}))}},onSuccess:r=>navigate(`/instructor/scenarios/${r.model}/${r.draft.document.id}`)});if(models.isPending||definitions.isPending||templates.isPending)return <LoadingState label="Loading scenario creation options"/>;if(models.isError)return <ErrorState error={models.error}/>;if(definitions.isError)return <ErrorState error={definitions.error}/>;if(templates.isError)return <ErrorState error={templates.error}/>;const available=models.data.filter(x=>x.scenarioAuthoringSupported&&(['Economics.ShortRunMacro','Economics.CompetitiveMarket'] as string[]).includes(x.identifier));return <><header className="page-heading"><p className="eyebrow">Scenario authoring</p><h1>Create scenario</h1><p>Choose an available backend definition and template starting point.</p></header><form className="card form-grid" onSubmit={e=>{e.preventDefault();create.mutate()}}><div className="form-field"><label htmlFor="create-model">Simulation model</label><select id="create-model" value={model} onChange={e=>{setModel(e.target.value as Model);setTemplateCode('')}}>{available.map(x=><option value={x.identifier} key={`${x.identifier}:${x.version}`}>{x.displayName} · {x.version}</option>)}</select></div><div className="form-field"><label htmlFor="definition-id">Simulation definition</label><select id="definition-id" value={definitionId} required onChange={e=>setDefinitionId(e.target.value)}><option value="">Select an owned definition</option>{definitions.data.map(x=><option value={x.id} key={x.id}>{x.displayName}</option>)}</select><div className="field-help">Definitions are generic instructor-owned containers; model identity is pinned on publication.</div></div><div className="form-field"><label htmlFor="create-name">Scenario title</label><input id="create-name" value={name} required onChange={e=>setName(e.target.value)}/></div><div className="form-field"><label htmlFor="create-template">Template</label><select id="create-template" value={templateCode} onChange={e=>setTemplateCode(e.target.value)}><option value="">Blank scenario</option>{templates.data.map(x=><option value={x.templateIdentifier} key={x.templateIdentifier}>{x.title}</option>)}</select></div><div className="button-row"><button disabled={create.isPending}>{create.isPending?'Creating…':'Create draft'}</button><Link to="/instructor/scenarios">Cancel</Link></div>{create.error&&<ErrorState error={create.error}/>}</form></>}
+type Model = "Economics.ShortRunMacro" | "Economics.CompetitiveMarket";
+type StatusFilter = "Active" | "Ready" | "Drafts" | "Archived";
+
+const statusLabels: Record<StatusFilter, string> = {
+  Active: "Active scenarios",
+  Ready: "Ready to use",
+  Drafts: "Drafts",
+  Archived: "Archived",
+};
+
+const modelLabel = (id: string) => {
+  if (id === "Economics.ShortRunMacro") return "Short-Run Macroeconomics";
+  if (id === "Economics.CompetitiveMarket") return "Competitive Market";
+  return id;
+};
+
+const statusBadge = (status: ScenarioSummary["lifecycleStatus"]) => {
+  if (status === "Published") return "Ready to use";
+  return status;
+};
+
+function summarizeScenario(scenario: ScenarioSummary): string[] {
+  const points: string[] = [];
+  if (scenario.maximumRounds) points.push(`${scenario.maximumRounds} rounds`);
+  return points;
+}
+
+function toRouteModel(modelIdentifier: string): "macro" | "market" {
+  return modelIdentifier.endsWith("ShortRunMacro") ? "macro" : "market";
+}
+
+function primaryActionLabel(scenario: ScenarioSummary): string {
+  if (scenario.lifecycleStatus === "Draft") return "Continue Editing";
+  if (scenario.lifecycleStatus === "Published") return "Launch Simulation";
+  return "View";
+}
+
+function modelDescription(model: Model): string {
+  if (model === "Economics.ShortRunMacro") {
+    return "Students manage growth, inflation, unemployment, and economic policy.";
+  }
+  return "Students participate in markets, pricing, buying, and selling.";
+}
+
+function templateFallbackTitle(code: string): string {
+  return code
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function compatibleDefinition(
+  definitions: SimulationDefinitionSummary[],
+  model: Model,
+): SimulationDefinitionSummary | null {
+  return (
+    definitions.find((x) => x.authorableModelIdentifiers.includes(model)) ??
+    null
+  );
+}
+
+function statusQueryParams(filter: StatusFilter): {
+  status?: "Draft" | "Published" | "Archived";
+  includeArchived?: boolean;
+} {
+  if (filter === "Ready") return { status: "Published" };
+  if (filter === "Drafts") return { status: "Draft" };
+  if (filter === "Archived") return { status: "Archived" };
+  return { includeArchived: false };
+}
+
+export function ScenarioLibraryPage() {
+  const { api } = useRuntime();
+  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const status = (params.get("show") ?? "Active") as StatusFilter;
+  const model = (params.get("model") ?? "") as Model | "";
+  const search = params.get("search") ?? "";
+  const page = Math.max(1, Number(params.get("page") ?? 1));
+
+  const setFilter = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (key !== "page") next.delete("page");
+    setParams(next);
+  };
+
+  const scenarioParams = statusQueryParams(
+    statusLabels[status] ? status : "Active",
+  );
+
+  const scenarios = useQuery({
+    queryKey: keys.scenarioLists(
+      user!.id,
+      scenarioParams.status ?? "Active",
+      model,
+      search,
+      page,
+      25,
+    ),
+    queryFn: ({ signal }) =>
+      scenarioDiscovery(api).scenarios(
+        {
+          ...scenarioParams,
+          modelIdentifier: model || undefined,
+          search: search || undefined,
+          page,
+          pageSize: 25,
+        },
+        signal,
+      ),
+  });
+
+  const models = useQuery({
+    queryKey: ["authoring-models"],
+    queryFn: ({ signal }) => scenarioDiscovery(api).models(signal),
+  });
+
+  const discoveredModels =
+    models.data?.filter(
+      (x: AuthoringModelSummary) => x.scenarioAuthoringSupported,
+    ) ?? [];
+
+  const hasFilter =
+    search.trim().length > 0 || model.length > 0 || status !== "Active";
+
+  return (
+    <>
+      <header className="page-heading">
+        <p className="eyebrow">Scenarios</p>
+        <h1>Scenario library</h1>
+        <p>Create, prepare, and launch simulations for your classes.</p>
+        <Link className="button-link" to="/instructor/scenarios/create">
+          Create Scenario
+        </Link>
+      </header>
+
+      <section className="library-toolbar" aria-label="Scenario filters">
+        <div className="input-row">
+          <label className="sr-only" htmlFor="scenario-search">
+            Search scenarios
+          </label>
+          <input
+            id="scenario-search"
+            value={search}
+            onChange={(e) => setFilter("search", e.target.value)}
+            placeholder="Search scenarios..."
+          />
+          <label className="sr-only" htmlFor="scenario-show">
+            Filter by status
+          </label>
+          <select
+            id="scenario-show"
+            value={statusLabels[status] ? status : "Active"}
+            onChange={(e) => setFilter("show", e.target.value)}
+          >
+            <option value="Active">Active scenarios</option>
+            <option value="Ready">Ready to use</option>
+            <option value="Drafts">Drafts</option>
+            <option value="Archived">Archived</option>
+          </select>
+          <label className="sr-only" htmlFor="scenario-model">
+            Filter by simulation type
+          </label>
+          <select
+            id="scenario-model"
+            value={model}
+            onChange={(e) => setFilter("model", e.target.value)}
+          >
+            <option value="">All simulation types</option>
+            {discoveredModels.map((x) => (
+              <option key={`${x.identifier}:${x.version}`} value={x.identifier}>
+                {x.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+      </section>
+
+      {models.isError && <ErrorState error={models.error} />}
+
+      <section>
+        <div className="section-heading">
+          <h2>{statusLabels[status] ?? statusLabels.Active}</h2>
+          <BackgroundStatus active={scenarios.isFetching} />
+        </div>
+
+        {scenarios.isPending ? (
+          <LoadingState label="Loading scenarios" />
+        ) : scenarios.isError ? (
+          <ErrorState
+            error={scenarios.error}
+            retry={() => void scenarios.refetch()}
+          />
+        ) : scenarios.data.items.length === 0 ? (
+          <EmptyState
+            title={
+              hasFilter
+                ? "No scenarios match these filters"
+                : "You haven't created a scenario yet."
+            }
+          >
+            <p>
+              {hasFilter
+                ? "Try adjusting your search or filters."
+                : "Scenarios describe the situation your students will work through during a simulation."}
+            </p>
+            {!hasFilter && (
+              <p>
+                <Link to="/instructor/scenarios/create">
+                  Create Your First Scenario
+                </Link>
+              </p>
+            )}
+          </EmptyState>
+        ) : (
+          <>
+            <div className="card-grid">
+              {scenarios.data.items.map((scenario) => (
+                <ScenarioCard scenario={scenario} key={scenario.scenarioId} />
+              ))}
+            </div>
+            <Pagination
+              page={scenarios.data.page}
+              pageSize={scenarios.data.pageSize}
+              total={scenarios.data.totalCount}
+              onPage={(next) => setFilter("page", String(next))}
+            />
+          </>
+        )}
+      </section>
+    </>
+  );
+}
+
+function ScenarioCard({ scenario }: { scenario: ScenarioSummary }) {
+  const teachingMetadata = summarizeScenario(scenario);
+  const draftRoute = `/instructor/scenarios/${toRouteModel(scenario.modelIdentifier)}/${scenario.draftId}`;
+
+  return (
+    <article className="card scenario-card compact">
+      <div className="scenario-card-head">
+        <p className="eyebrow">{modelLabel(scenario.modelIdentifier)}</p>
+        <span
+          className={`scenario-status ${scenario.lifecycleStatus.toLowerCase()}`}
+        >
+          {statusBadge(scenario.lifecycleStatus)}
+        </span>
+      </div>
+
+      <h3>{scenario.title}</h3>
+      {scenario.summary && <p>{scenario.summary}</p>}
+
+      {teachingMetadata.length > 0 && (
+        <p className="muted">{teachingMetadata.join(" • ")}</p>
+      )}
+      <p className="muted">
+        Updated {new Date(scenario.updatedAt).toLocaleDateString()}
+      </p>
+
+      <div className="button-row">
+        {scenario.lifecycleStatus === "Draft" && (
+          <Link to={draftRoute}>{primaryActionLabel(scenario)}</Link>
+        )}
+        {scenario.lifecycleStatus === "Published" &&
+          scenario.publishedVersionId && (
+            <Link
+              to={`/instructor/scenarios/versions/${scenario.publishedVersionId}`}
+            >
+              {primaryActionLabel(scenario)}
+            </Link>
+          )}
+        {scenario.lifecycleStatus === "Archived" &&
+          scenario.publishedVersionId && (
+            <Link
+              to={`/instructor/scenarios/versions/${scenario.publishedVersionId}`}
+            >
+              {primaryActionLabel(scenario)}
+            </Link>
+          )}
+
+        <details className="actions-menu">
+          <summary>...</summary>
+          <div className="actions-panel">
+            {scenario.publishedVersionId && (
+              <Link
+                to={`/instructor/scenarios/${scenario.scenarioId}/versions`}
+              >
+                View version history
+              </Link>
+            )}
+            {scenario.lifecycleStatus === "Published" && (
+              <Link to={draftRoute}>Create editable copy</Link>
+            )}
+            {scenario.lifecycleStatus === "Draft" && (
+              <Link to={draftRoute}>Duplicate from editor</Link>
+            )}
+          </div>
+        </details>
+      </div>
+    </article>
+  );
+}
+
+export function ScenarioVersionHistoryPage() {
+  const { api } = useRuntime();
+  const { user } = useAuth();
+  const { scenarioId } = useParams();
+  const id = scenarioId!;
+  const q = useQuery({
+    queryKey: keys.scenarioVersions(user!.id, id),
+    queryFn: ({ signal }) => scenarioDiscovery(api).versions(id, signal),
+  });
+
+  if (q.isPending) return <LoadingState label="Loading version history" />;
+  if (q.isError)
+    return <ErrorState error={q.error} retry={() => void q.refetch()} />;
+
+  return (
+    <>
+      <header className="page-heading">
+        <p className="eyebrow">Version history</p>
+        <h1>Published versions</h1>
+        <p>Review past published versions of this scenario.</p>
+      </header>
+
+      {q.data.length === 0 ? (
+        <EmptyState title="No published versions">
+          <p>This scenario has not been published yet.</p>
+        </EmptyState>
+      ) : (
+        <div className="card-grid">
+          {q.data.map((v) => (
+            <article className="card" key={v.publishedVersionId}>
+              <p className="eyebrow">
+                {v.isLatest
+                  ? "Current version"
+                  : `Version ${v.scenarioVersionNumber}`}
+              </p>
+              <h2>{v.title}</h2>
+              <p>{modelLabel(v.modelIdentifier)}</p>
+              <p>Published {new Date(v.publishedAt).toLocaleDateString()}</p>
+              <Link
+                to={`/instructor/scenarios/versions/${v.publishedVersionId}`}
+              >
+                View scenario details
+              </Link>
+            </article>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+export function PublishedVersionPage() {
+  const { api } = useRuntime();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { versionId } = useParams();
+
+  const q = useQuery({
+    queryKey: keys.publishedVersion(user!.id, versionId!),
+    queryFn: ({ signal }) => scenarioDiscovery(api).version(versionId!, signal),
+  });
+
+  const classrooms = useQuery({
+    queryKey: keys.classrooms(user!.id, 1, 100),
+    queryFn: ({ signal }) => courseService(api).classrooms(1, 100, signal),
+  });
+
+  const [sessionName, setSessionName] = useState("");
+  const [chosenClassroom, setChosenClassroom] = useState("");
+
+  const launch = useMutation({
+    mutationFn: () =>
+      courseService(api).createSession(
+        chosenClassroom,
+        { scenarioVersionId: versionId!, seed: 1 },
+        crypto.randomUUID(),
+      ),
+    onSuccess: (result) => navigate(`/instructor/sessions/${result.id}/setup`),
+  });
+
+  if (q.isPending || classrooms.isPending)
+    return <LoadingState label="Loading scenario details" />;
+  if (q.isError)
+    return <ErrorState error={q.error} retry={() => void q.refetch()} />;
+  if (classrooms.isError)
+    return (
+      <ErrorState
+        error={classrooms.error}
+        retry={() => void classrooms.refetch()}
+      />
+    );
+
+  const v: PublishedScenarioVersionSummary = q.data;
+
+  return (
+    <>
+      <header className="page-heading">
+        <Link to="/instructor/scenarios">Back to Scenarios</Link>
+        <p className="eyebrow scenario-status published">Ready to use</p>
+        <h1>{v.title}</h1>
+        <p>{modelLabel(v.modelIdentifier)}</p>
+      </header>
+
+      <section className="card">
+        <p>
+          This published scenario is locked so simulations always use the
+          version you prepared.
+        </p>
+        <p>Published {new Date(v.publishedAt).toLocaleDateString()}</p>
+      </section>
+
+      {v.launchable ? (
+        <section className="card">
+          <h2>Launch Simulation</h2>
+          <p>{v.title}</p>
+
+          <label htmlFor="launch-session-name">Session name</label>
+          <input
+            id="launch-session-name"
+            value={sessionName}
+            onChange={(e) => setSessionName(e.target.value)}
+            placeholder="Intermediate Macro - Monday"
+          />
+
+          <label htmlFor="launch-classroom">Classroom</label>
+          <select
+            id="launch-classroom"
+            value={chosenClassroom}
+            onChange={(e) => setChosenClassroom(e.target.value)}
+          >
+            <option value="">
+              No classroom / Quick session (select when available)
+            </option>
+            {classrooms.data.items.map((classroom) => (
+              <option key={classroom.classroomId} value={classroom.classroomId}>
+                {classroom.name}
+              </option>
+            ))}
+          </select>
+
+          <p className="muted">Students will join using a session code.</p>
+
+          <div className="button-row">
+            <Link className="secondary" to="/instructor/scenarios">
+              Cancel
+            </Link>
+            <button
+              type="button"
+              onClick={() => launch.mutate()}
+              disabled={!chosenClassroom || launch.isPending}
+            >
+              {launch.isPending ? "Launching Session..." : "Launch Session"}
+            </button>
+          </div>
+
+          {!chosenClassroom && (
+            <p className="field-help">
+              Choose a classroom to launch this session.
+            </p>
+          )}
+          {launch.error && <ErrorState error={launch.error} />}
+        </section>
+      ) : (
+        <section className="card">
+          <h2>Not ready to launch</h2>
+          <p>
+            {v.launchabilityReason ??
+              "This scenario is not currently launchable."}
+          </p>
+        </section>
+      )}
+    </>
+  );
+}
+
+export function CreateScenarioPage() {
+  const { api } = useRuntime();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const [model, setModel] = useState<Model>(
+    (searchParams.get("model") as Model) || "Economics.ShortRunMacro",
+  );
+  const [templateCode, setTemplateCode] = useState(
+    searchParams.get("template") || "",
+  );
+  const [name, setName] = useState("");
+  const [summary, setSummary] = useState("");
+
+  const models = useQuery({
+    queryKey: ["authoring-models"],
+    queryFn: ({ signal }) => scenarioDiscovery(api).models(signal),
+  });
+
+  const definitions = useQuery({
+    queryKey: ["definitions"],
+    queryFn: ({ signal }) => scenarioDiscovery(api).definitions(signal),
+  });
+
+  const templates = useQuery({
+    queryKey: ["scenario-templates", model],
+    queryFn: ({ signal }) => scenarioDiscovery(api).templates(model, signal),
+  });
+
+  const macroContent = useQuery({
+    queryKey: ["authoring-content-templates", "macro"],
+    queryFn: ({ signal }) => macroAuthoring(api).templates(signal),
+  });
+
+  const marketContent = useQuery({
+    queryKey: ["authoring-content-templates", "market"],
+    queryFn: ({ signal }) => marketAuthoring(api).templates(signal),
+  });
+
+  const supportedModels = useMemo(
+    () => models.data?.filter((x) => x.scenarioAuthoringSupported) ?? [],
+    [models.data],
+  );
+
+  const definition = useMemo(
+    () => compatibleDefinition(definitions.data ?? [], model),
+    [definitions.data, model],
+  );
+
+  const create = useMutation({
+    mutationFn: async () => {
+      if (!definition)
+        throw new Error(
+          "No compatible workspace is available for this simulation type.",
+        );
+      if (!name.trim()) throw new Error("Scenario name is required.");
+
+      const selectedTemplate = templateCode.trim();
+
+      if (model === "Economics.ShortRunMacro") {
+        const service = macroAuthoring(api);
+        const base = selectedTemplate
+          ? (macroContent.data?.find((x) => x.code === selectedTemplate)
+              ?.content ?? blankMacro())
+          : blankMacro();
+
+        const content: MacroScenarioContent = {
+          ...base,
+          briefing: summary.trim() || base.briefing,
+        };
+
+        const draft = await service.create(
+          service.prepareCreate({
+            simulationDefinitionId: definition.id,
+            name: name.trim(),
+            content,
+          }),
+        );
+
+        return { model: "macro", id: draft.document.id };
+      }
+
+      const service = marketAuthoring(api);
+      const base = selectedTemplate
+        ? (marketContent.data?.find((x) => x.code === selectedTemplate)
+            ?.content ?? blankMarket())
+        : blankMarket();
+
+      const content: CompetitiveMarketScenarioContent = {
+        ...base,
+        briefing: summary.trim() || base.briefing,
+      };
+
+      const draft = await service.create(
+        service.prepareCreate({
+          simulationDefinitionId: definition.id,
+          name: name.trim(),
+          content,
+        }),
+      );
+
+      return { model: "market", id: draft.document.id };
+    },
+    onSuccess: (result) =>
+      navigate(`/instructor/scenarios/${result.model}/${result.id}`),
+  });
+
+  if (
+    models.isPending ||
+    definitions.isPending ||
+    templates.isPending ||
+    macroContent.isPending ||
+    marketContent.isPending
+  ) {
+    return <LoadingState label="Loading scenario setup" />;
+  }
+
+  if (models.isError)
+    return (
+      <ErrorState error={models.error} retry={() => void models.refetch()} />
+    );
+  if (definitions.isError)
+    return (
+      <ErrorState
+        error={definitions.error}
+        retry={() => void definitions.refetch()}
+      />
+    );
+  if (templates.isError)
+    return (
+      <ErrorState
+        error={templates.error}
+        retry={() => void templates.refetch()}
+      />
+    );
+  if (macroContent.isError)
+    return (
+      <ErrorState
+        error={macroContent.error}
+        retry={() => void macroContent.refetch()}
+      />
+    );
+  if (marketContent.isError)
+    return (
+      <ErrorState
+        error={marketContent.error}
+        retry={() => void marketContent.refetch()}
+      />
+    );
+
+  const contentTemplates =
+    model === "Economics.ShortRunMacro"
+      ? macroContent.data
+      : marketContent.data;
+
+  return (
+    <>
+      <header className="page-heading">
+        <p className="eyebrow">Create a Scenario</p>
+        <h1>Create a Scenario</h1>
+        <p>
+          Choose a simulation type, pick a starting point, and create your
+          draft.
+        </p>
+      </header>
+
+      <section className="card">
+        <h2>1. Choose a simulation type</h2>
+        <div className="card-grid">
+          {supportedModels.map((candidate: AuthoringModelSummary) => {
+            const selected = candidate.identifier === model;
+            return (
+              <article
+                className="card"
+                key={`${candidate.identifier}:${candidate.version}`}
+              >
+                <h3>{candidate.displayName}</h3>
+                <p>{modelDescription(candidate.identifier as Model)}</p>
+                <button
+                  type="button"
+                  className={selected ? "" : "secondary"}
+                  onClick={() => {
+                    setModel(candidate.identifier as Model);
+                    setTemplateCode("");
+                  }}
+                >
+                  {selected ? "Selected" : "Choose"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>2. How would you like to start?</h2>
+        {templates.data.length === 0 ? (
+          <p className="muted">
+            No recommended templates are available right now for this simulation
+            type.
+          </p>
+        ) : (
+          <div className="card-grid">
+            {templates.data.map((template) => (
+              <article className="card" key={template.templateIdentifier}>
+                <h3>
+                  {template.title ||
+                    templateFallbackTitle(template.templateIdentifier)}
+                </h3>
+                <p>
+                  {template.description ||
+                    template.learningPurposeSummary ||
+                    "Recommended starting point."}
+                </p>
+                <button
+                  type="button"
+                  className={
+                    templateCode === template.templateIdentifier
+                      ? ""
+                      : "secondary"
+                  }
+                  onClick={() => setTemplateCode(template.templateIdentifier)}
+                >
+                  {templateCode === template.templateIdentifier
+                    ? "Selected template"
+                    : "Use Template"}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div className="button-row">
+          <button
+            type="button"
+            className={templateCode === "" ? "" : "secondary"}
+            onClick={() => setTemplateCode("")}
+          >
+            Start from scratch
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h2>3. Name your scenario</h2>
+        <label htmlFor="scenario-name">Scenario name</label>
+        <input
+          id="scenario-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Stagflation Crisis"
+        />
+
+        <label htmlFor="scenario-summary">Short description (optional)</label>
+        <textarea
+          id="scenario-summary"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          placeholder="Students manage an economy experiencing high inflation and weak growth."
+        />
+
+        <p className="field-help">
+          Simulation definitions are resolved automatically in the background.
+        </p>
+
+        {definition ? (
+          <button
+            type="button"
+            disabled={create.isPending || !name.trim()}
+            onClick={() => create.mutate()}
+          >
+            {create.isPending ? "Creating Scenario..." : "Create Scenario"}
+          </button>
+        ) : (
+          <p className="notice">
+            No compatible workspace was found for this simulation type.
+          </p>
+        )}
+        {create.error && <ErrorState error={create.error} />}
+      </section>
+
+      <section className="card">
+        <h2>Selected starting point</h2>
+        <p>
+          {templateCode
+            ? (contentTemplates.find((x) => x.code === templateCode)?.name ??
+              templateFallbackTitle(templateCode))
+            : "Start from scratch"}
+        </p>
+      </section>
+    </>
+  );
+}

@@ -1,14 +1,20 @@
 import type { ApiClient } from '../../lib/api/client';
 import type { IdResult, NamedCourseRequest, NameRequest, UserRequest } from '../../types/platform';
-import type { ClassroomDetail, ClassroomPage, ClassroomRosterEntry, SessionPage, SessionSetup, StudentSessionSummary } from '../../types/classrooms';
+import type { ClassroomDetail, ClassroomPage, ClassroomRosterEntry, ClassroomJoinRequest, SessionPage, SessionSetup, StudentSessionSummary } from '../../types/classrooms';
 /** Provisioning boundary only. No discovery endpoints are implemented by the backend. */
 export const courseService = (api: ApiClient) => ({
   create: (body: NamedCourseRequest) => api.json<IdResult>('/api/v1/courses', { method: 'POST', body }),
   createClassroom: (courseId: string, body: NameRequest) => api.json<IdResult>(`/api/v1/courses/${encodeURIComponent(courseId)}/classrooms`, { method: 'POST', body }),
+  createDefinition: (name: string) => api.json<IdResult>('/api/v1/simulation-definitions', { method: 'POST', body: { name } }),
   enroll: (classroomId: string, body: UserRequest) => api.json<void>(`/api/v1/classrooms/${encodeURIComponent(classroomId)}/enrollments`, { method: 'POST', body }),
   classrooms: (page = 1, pageSize = 25, signal?: AbortSignal) => api.json<ClassroomPage>(`/api/v1/classrooms?page=${page}&pageSize=${pageSize}`, { signal }),
   classroom: (id: string, signal?: AbortSignal) => api.json<ClassroomDetail>(`/api/v1/classrooms/${encodeURIComponent(id)}`, { signal }),
   roster: (id: string, signal?: AbortSignal) => api.json<ClassroomRosterEntry[]>(`/api/v1/classrooms/${encodeURIComponent(id)}/roster`, { signal }),
+  classroomJoinCode: (id: string, signal?: AbortSignal) => api.json<{ classroomId: string; joinCode: string; active: boolean }>(`/api/v1/classrooms/${encodeURIComponent(id)}/join-code`, { signal }),
+  joinRequests: (id: string, signal?: AbortSignal) => api.json<ClassroomJoinRequest[]>(`/api/v1/classrooms/${encodeURIComponent(id)}/join-requests`, { signal }),
+  requestClassroomJoin: (code: string) => api.json<{ requestId?: string; status: string; classroomId: string }>('/api/v1/classroom-join-requests', { method: 'POST', body: { code } }),
+  approveJoin: (classroomId: string, requestId: string) => api.json<void>(`/api/v1/classrooms/${encodeURIComponent(classroomId)}/join-requests/${encodeURIComponent(requestId)}/approve`, { method: 'POST' }),
+  rejectJoin: (classroomId: string, requestId: string) => api.json<void>(`/api/v1/classrooms/${encodeURIComponent(classroomId)}/join-requests/${encodeURIComponent(requestId)}/reject`, { method: 'POST' }),
   sessions: (params: { page?: number; pageSize?: number; classroomId?: string; status?: string; modelIdentifier?: string } = {}, signal?: AbortSignal) => { const q = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 25) }); if (params.classroomId) q.set('classroomId', params.classroomId); if (params.status) q.set('status', params.status); if (params.modelIdentifier) q.set('modelIdentifier', params.modelIdentifier); return api.json<SessionPage>(`/api/v1/sessions?${q}`, { signal }); },
   mySessions: (signal?: AbortSignal) => api.json<StudentSessionSummary[]>('/api/v1/me/sessions', { signal }),
   setup: (id: string, signal?: AbortSignal) => api.json<SessionSetup>(`/api/v1/sessions/${encodeURIComponent(id)}/setup`, { signal }),
