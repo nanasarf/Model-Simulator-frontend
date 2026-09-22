@@ -10,7 +10,24 @@ import {
   ErrorState,
   LoadingState,
 } from "../../components/states";
-import type { ClassroomSummary } from "../../types/classrooms";
+import type {
+  ClassroomJoinRequest,
+  ClassroomSummary,
+} from "../../types/classrooms";
+
+function classroomRequestStatusLabel(status: string) {
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "pending") return "Pending";
+  if (normalized === "enrolled" || normalized === "approved") return "Enrolled";
+  if (
+    normalized === "rejected" ||
+    normalized === "not approved" ||
+    normalized === "denied"
+  ) {
+    return "Not approved";
+  }
+  return status;
+}
 
 export function ClassroomListPage() {
   const { api } = useRuntime();
@@ -124,9 +141,22 @@ export function ClassroomDetailPage() {
   const { api } = useRuntime();
   const { user } = useAuth();
   const { classroomId = "" } = useParams();
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: keys.classroom(user!.id, classroomId),
     queryFn: ({ signal }) => courseService(api).classroom(classroomId, signal),
+  });
+  const joinCode = useQuery({
+    queryKey: keys.classroomJoinCode(user!.id, classroomId),
+    queryFn: ({ signal }) =>
+      courseService(api).classroomJoinCode(classroomId, signal),
+    enabled: !!q.data,
+  });
+  const joinRequests = useQuery({
+    queryKey: keys.classroomJoinRequests(user!.id, classroomId),
+    queryFn: ({ signal }) =>
+      courseService(api).joinRequests(classroomId, signal),
+    enabled: !!q.data,
   });
   const roster = useQuery({
     queryKey: keys.roster(user!.id, classroomId),
@@ -141,6 +171,22 @@ export function ClassroomDetailPage() {
         signal,
       ),
     enabled: !!q.data,
+  });
+  const refreshMembership = () => {
+    void qc.invalidateQueries({
+      queryKey: keys.classroomJoinRequests(user!.id, classroomId),
+    });
+    void qc.invalidateQueries({ queryKey: keys.roster(user!.id, classroomId) });
+  };
+  const approve = useMutation({
+    mutationFn: (requestId: string) =>
+      courseService(api).approveJoin(classroomId, requestId),
+    onSuccess: refreshMembership,
+  });
+  const reject = useMutation({
+    mutationFn: (requestId: string) =>
+      courseService(api).rejectJoin(classroomId, requestId),
+    onSuccess: refreshMembership,
   });
   if (q.isPending) return <LoadingState label="Loading classroom" />;
   if (q.isError)
@@ -160,6 +206,79 @@ export function ClassroomDetailPage() {
           Start a Simulation
         </Link>
       </header>
+      <section className="card">
+        <div className="section-heading">
+          <h2>Classroom code</h2>
+        </div>
+        {joinCode.isPending ? (
+          <LoadingState label="Loading classroom code" />
+        ) : joinCode.isError ? (
+          <ErrorState
+            error={joinCode.error}
+            retry={() => void joinCode.refetch()}
+          />
+        ) : joinCode.data?.active ? (
+          <>
+            <p className="session-code">
+              Classroom code <strong>{joinCode.data.joinCode}</strong>
+            </p>
+            <p className="muted">
+              Students use this code to request classroom access.
+            </p>
+          </>
+        ) : (
+          <p>This classroom code is not active right now.</p>
+        )}
+      </section>
+      <section>
+        <div className="section-heading">
+          <h2>Pending requests</h2>
+          <BackgroundStatus active={joinRequests.isFetching} />
+        </div>
+        {joinRequests.isPending ? (
+          <LoadingState label="Loading join requests" />
+        ) : joinRequests.isError ? (
+          <ErrorState
+            error={joinRequests.error}
+            retry={() => void joinRequests.refetch()}
+          />
+        ) : joinRequests.data.length === 0 ? (
+          <EmptyState title="No pending requests">
+            <p>Student requests to join this classroom will appear here.</p>
+          </EmptyState>
+        ) : (
+          <div className="card-grid">
+            {joinRequests.data.map((request: ClassroomJoinRequest) => (
+              <article className="card" key={request.id}>
+                <p className="eyebrow">
+                  {classroomRequestStatusLabel(request.status)}
+                </p>
+                <h3>{request.studentUserId}</h3>
+                <p className="muted">
+                  Requested {new Date(request.requestedAt).toLocaleString()}
+                </p>
+                <div className="button-row">
+                  <button
+                    type="button"
+                    onClick={() => approve.mutate(request.id)}
+                    disabled={approve.isPending || reject.isPending}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => reject.mutate(request.id)}
+                    disabled={approve.isPending || reject.isPending}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
       <section>
         <div className="section-heading">
           <h2>Roster</h2>
