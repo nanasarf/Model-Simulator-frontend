@@ -28,6 +28,7 @@ import { blankMarket } from "../competitive-market/authoring";
 import { macroAuthoring, marketAuthoring } from "./service";
 import { courseService } from "../courses/service";
 import { Pagination } from "../instructor/classrooms";
+import { resolveScenarioUiState, scenarioDraftRoute } from "./ui-state";
 
 type Model = "Economics.ShortRunMacro" | "Economics.CompetitiveMarket";
 type StatusFilter = "Active" | "Ready" | "Drafts" | "Archived";
@@ -45,11 +46,6 @@ const modelLabel = (id: string) => {
   return id;
 };
 
-const statusBadge = (status: ScenarioSummary["lifecycleStatus"]) => {
-  if (status === "Published") return "Ready to use";
-  return status;
-};
-
 function summarizeScenario(scenario: ScenarioSummary): string[] {
   const points: string[] = [];
   if (scenario.maximumRounds) points.push(`${scenario.maximumRounds} rounds`);
@@ -58,12 +54,6 @@ function summarizeScenario(scenario: ScenarioSummary): string[] {
 
 function toRouteModel(modelIdentifier: string): "macro" | "market" {
   return modelIdentifier.endsWith("ShortRunMacro") ? "macro" : "market";
-}
-
-function primaryActionLabel(scenario: ScenarioSummary): string {
-  if (scenario.lifecycleStatus === "Draft") return "Continue Editing";
-  if (scenario.lifecycleStatus === "Published") return "Launch Simulation";
-  return "View";
 }
 
 function modelDescription(model: Model): string {
@@ -108,6 +98,7 @@ export function ScenarioLibraryPage() {
   const model = (params.get("model") ?? "") as Model | "";
   const search = params.get("search") ?? "";
   const page = Math.max(1, Number(params.get("page") ?? 1));
+  const classroomId = params.get("launchFor") ?? "";
 
   const setFilter = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -160,8 +151,12 @@ export function ScenarioLibraryPage() {
     <>
       <header className="page-heading">
         <p className="eyebrow">Scenarios</p>
-        <h1>Scenario library</h1>
-        <p>Create, prepare, and launch simulations for your classes.</p>
+        <h1>{classroomId ? "Choose a scenario" : "Scenario library"}</h1>
+        <p>
+          {classroomId
+            ? "Pick a ready-to-use scenario for this classroom."
+            : "Create, prepare, and launch simulations for your classes."}
+        </p>
         <Link className="button-link" to="/instructor/scenarios/create">
           Create Scenario
         </Link>
@@ -249,7 +244,11 @@ export function ScenarioLibraryPage() {
           <>
             <div className="card-grid">
               {scenarios.data.items.map((scenario) => (
-                <ScenarioCard scenario={scenario} key={scenario.scenarioId} />
+                <ScenarioCard
+                  classroomId={classroomId}
+                  scenario={scenario}
+                  key={scenario.scenarioId}
+                />
               ))}
             </div>
             <Pagination
@@ -265,23 +264,32 @@ export function ScenarioLibraryPage() {
   );
 }
 
-function ScenarioCard({ scenario }: { scenario: ScenarioSummary }) {
+function ScenarioCard({
+  scenario,
+  classroomId,
+}: {
+  scenario: ScenarioSummary;
+  classroomId: string;
+}) {
+  const state = resolveScenarioUiState(scenario);
   const teachingMetadata = summarizeScenario(scenario);
-  const draftRoute = `/instructor/scenarios/${toRouteModel(scenario.modelIdentifier)}/${scenario.draftId}`;
+  const primaryHref = classroomId
+    ? `${state.primaryHref}${state.primaryHref.includes("?") ? "&" : "?"}classroomId=${encodeURIComponent(classroomId)}`
+    : state.primaryHref;
 
   return (
     <article className="card scenario-card compact">
       <div className="scenario-card-head">
         <p className="eyebrow">{modelLabel(scenario.modelIdentifier)}</p>
-        <span
-          className={`scenario-status ${scenario.lifecycleStatus.toLowerCase()}`}
-        >
-          {statusBadge(scenario.lifecycleStatus)}
+        <span className={`scenario-status ${state.teachingStatus}`}>
+          {state.badgeLabel}
         </span>
       </div>
 
       <h3>{scenario.title}</h3>
       {scenario.summary && <p>{scenario.summary}</p>}
+
+      {state.helperLabel && <p className="muted">{state.helperLabel}</p>}
 
       {teachingMetadata.length > 0 && (
         <p className="muted">{teachingMetadata.join(" • ")}</p>
@@ -291,25 +299,12 @@ function ScenarioCard({ scenario }: { scenario: ScenarioSummary }) {
       </p>
 
       <div className="button-row">
-        {scenario.lifecycleStatus === "Draft" && (
-          <Link to={draftRoute}>{primaryActionLabel(scenario)}</Link>
+        <Link to={primaryHref}>{state.primaryActionLabel}</Link>
+        {state.secondaryActionLabel && state.secondaryHref && (
+          <Link className="secondary" to={state.secondaryHref}>
+            {state.secondaryActionLabel}
+          </Link>
         )}
-        {scenario.lifecycleStatus === "Published" &&
-          scenario.publishedVersionId && (
-            <Link
-              to={`/instructor/scenarios/versions/${scenario.publishedVersionId}`}
-            >
-              {primaryActionLabel(scenario)}
-            </Link>
-          )}
-        {scenario.lifecycleStatus === "Archived" &&
-          scenario.publishedVersionId && (
-            <Link
-              to={`/instructor/scenarios/versions/${scenario.publishedVersionId}`}
-            >
-              {primaryActionLabel(scenario)}
-            </Link>
-          )}
 
         <details className="actions-menu">
           <summary>...</summary>
@@ -321,11 +316,13 @@ function ScenarioCard({ scenario }: { scenario: ScenarioSummary }) {
                 View version history
               </Link>
             )}
-            {scenario.lifecycleStatus === "Published" && (
-              <Link to={draftRoute}>Create editable copy</Link>
+            {scenario.lifecycleStatus !== "Draft" && (
+              <Link to={scenarioDraftRoute(scenario)}>Continue Editing</Link>
             )}
             {scenario.lifecycleStatus === "Draft" && (
-              <Link to={draftRoute}>Duplicate from editor</Link>
+              <Link to={scenarioDraftRoute(scenario)}>
+                Duplicate from editor
+              </Link>
             )}
           </div>
         </details>
@@ -390,6 +387,7 @@ export function PublishedVersionPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { versionId } = useParams();
+  const [searchParams] = useSearchParams();
 
   const q = useQuery({
     queryKey: keys.publishedVersion(user!.id, versionId!),
@@ -401,8 +399,9 @@ export function PublishedVersionPage() {
     queryFn: ({ signal }) => courseService(api).classrooms(1, 100, signal),
   });
 
-  const [sessionName, setSessionName] = useState("");
-  const [chosenClassroom, setChosenClassroom] = useState("");
+  const [chosenClassroom, setChosenClassroom] = useState(
+    searchParams.get("classroomId") ?? "",
+  );
 
   const launch = useMutation({
     mutationFn: () =>
@@ -447,16 +446,8 @@ export function PublishedVersionPage() {
 
       {v.launchable ? (
         <section className="card">
-          <h2>Launch Simulation</h2>
-          <p>{v.title}</p>
-
-          <label htmlFor="launch-session-name">Session name</label>
-          <input
-            id="launch-session-name"
-            value={sessionName}
-            onChange={(e) => setSessionName(e.target.value)}
-            placeholder="Intermediate Macro - Monday"
-          />
+          <h2>Use in Class</h2>
+          <p>Choose the classroom where this scenario will run.</p>
 
           <label htmlFor="launch-classroom">Classroom</label>
           <select
@@ -464,9 +455,7 @@ export function PublishedVersionPage() {
             value={chosenClassroom}
             onChange={(e) => setChosenClassroom(e.target.value)}
           >
-            <option value="">
-              No classroom / Quick session (select when available)
-            </option>
+            <option value="">Choose a classroom</option>
             {classrooms.data.items.map((classroom) => (
               <option key={classroom.classroomId} value={classroom.classroomId}>
                 {classroom.name}
@@ -485,13 +474,13 @@ export function PublishedVersionPage() {
               onClick={() => launch.mutate()}
               disabled={!chosenClassroom || launch.isPending}
             >
-              {launch.isPending ? "Launching Session..." : "Launch Session"}
+              {launch.isPending ? "Opening Session..." : "Open Session"}
             </button>
           </div>
 
           {!chosenClassroom && (
             <p className="field-help">
-              Choose a classroom to launch this session.
+              Choose a classroom to open this session.
             </p>
           )}
           {launch.error && <ErrorState error={launch.error} />}

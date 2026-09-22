@@ -596,6 +596,8 @@ export function ScenarioEditorPage() {
         return;
       }
       queries.setQueryData(key, result.resource);
+      setContent(structuredClone(result.resource.content) as AnyContent);
+      setRules(parseRules(result.resource.content as AnyContent));
       setDirty(false);
       setSaveState("saved");
       setValidation(null);
@@ -624,10 +626,45 @@ export function ScenarioEditorPage() {
         expectedVersion: query.data!.document.version,
       }),
     onSuccess: (result) => {
-      setPublishedId(result.scenarioVersionId);
-      setStep("review");
+      void Promise.all([
+        queries.invalidateQueries({
+          queryKey: ["user", user!.id, "scenarios"],
+        }),
+        queries.invalidateQueries({ queryKey: ["user", user!.id, "scenario"] }),
+        queries.invalidateQueries({
+          queryKey: ["user", user!.id, "published-version"],
+        }),
+        queries.invalidateQueries({ queryKey: ["user", user!.id, "sessions"] }),
+      ]).then(() => {
+        navigate(`/instructor/scenarios/versions/${result.scenarioVersionId}`, {
+          replace: true,
+        });
+      });
     },
   });
+
+  const publishScenario = async () => {
+    if (dirty) {
+      setStep("review");
+      return;
+    }
+
+    const currentValidation =
+      validation ?? (await validate.mutateAsync().catch(() => null));
+    if (!currentValidation) {
+      setStep("review");
+      return;
+    }
+    if (
+      !currentValidation.canPublish ||
+      currentValidation.blockers.length > 0
+    ) {
+      setStep("review");
+      return;
+    }
+
+    publish.mutate();
+  };
 
   const archive = useMutation({
     mutationFn: () =>
@@ -677,6 +714,23 @@ export function ScenarioEditorPage() {
         <p className="muted" role="status">
           {saveStateLabel(saveState)}
         </p>
+        <div className="editor-actions editor-actions-top">
+          <button
+            type="button"
+            disabled={immutable || save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? "Saving..." : "Save Draft"}
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={immutable || publish.isPending || validate.isPending}
+            onClick={() => void publishScenario()}
+          >
+            {publish.isPending ? "Publishing..." : "Publish Scenario"}
+          </button>
+        </div>
       </header>
 
       {immutable && (

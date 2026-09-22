@@ -6,6 +6,7 @@ import { keys } from "../../lib/api/query";
 import { EmptyState, ErrorState, LoadingState } from "../../components/states";
 import { courseService } from "../courses/service";
 import { scenarioDiscovery } from "../scenarios/discovery";
+import { resolveScenarioUiState } from "../scenarios/ui-state";
 import type { ScenarioSummary } from "../../types/discovery";
 import type { SessionSummary } from "../../types/classrooms";
 
@@ -17,11 +18,6 @@ const modelLabel = (id: string) => {
 
 const toRouteModel = (modelIdentifier: string): "macro" | "market" =>
   modelIdentifier.endsWith("ShortRunMacro") ? "macro" : "market";
-
-function statusLabel(status: ScenarioSummary["lifecycleStatus"]): string {
-  if (status === "Published") return "Ready to use";
-  return status;
-}
 
 function sessionStateLabel(status: string): string {
   const lower = status.toLowerCase();
@@ -95,8 +91,11 @@ export function InstructorHome() {
   });
 
   const recentScenarios = (scenarios.data?.items ?? []).slice(0, 4);
+  const readyScenario = (scenarios.data?.items ?? []).find(
+    (item) => resolveScenarioUiState(item).teachingStatus === "ready",
+  );
   const draftScenario = (scenarios.data?.items ?? []).find(
-    (item) => item.lifecycleStatus === "Draft",
+    (item) => resolveScenarioUiState(item).teachingStatus === "draft",
   );
   const continueSession = liveSessions[0] ?? null;
 
@@ -111,15 +110,23 @@ export function InstructorHome() {
             ? `/instructor/sessions/${continueSession.sessionId}/setup`
             : `/simulation/${continueSession.sessionId}`,
       }
-    : draftScenario
+    : readyScenario
       ? {
-          type: "draft" as const,
-          title: draftScenario.title,
-          meta: `Draft scenario • Last edited ${new Date(draftScenario.updatedAt).toLocaleString()}`,
-          cta: "Continue Editing",
-          href: `/instructor/scenarios/${toRouteModel(draftScenario.modelIdentifier)}/${draftScenario.draftId}`,
+          type: "ready" as const,
+          title: readyScenario.title,
+          meta: `${resolveScenarioUiState(readyScenario).helperLabel ?? "Ready to use"}${readyScenario.launchabilityReason ? ` • ${readyScenario.launchabilityReason}` : ""}`,
+          cta: "Use in Class",
+          href: `/instructor/scenarios/versions/${readyScenario.publishedVersionId}`,
         }
-      : null;
+      : draftScenario
+        ? {
+            type: "draft" as const,
+            title: draftScenario.title,
+            meta: `${resolveScenarioUiState(draftScenario).helperLabel ?? "Draft scenario"} • Last edited ${new Date(draftScenario.updatedAt).toLocaleString()}`,
+            cta: "Continue Editing",
+            href: `/instructor/scenarios/${toRouteModel(draftScenario.modelIdentifier)}/${draftScenario.draftId}`,
+          }
+        : null;
 
   if (sessions.isPending || scenarios.isPending || classrooms.isPending) {
     return <LoadingState label="Preparing your teaching workspace" />;
@@ -302,15 +309,7 @@ export function InstructorHome() {
         ) : (
           <div className="card-grid recent-scenarios-grid">
             {recentScenarios.map((scenario) => {
-              const href =
-                scenario.lifecycleStatus === "Draft"
-                  ? `/instructor/scenarios/${toRouteModel(scenario.modelIdentifier)}/${scenario.draftId}`
-                  : scenario.publishedVersionId
-                    ? `/instructor/scenarios/versions/${scenario.publishedVersionId}`
-                    : "/instructor/scenarios";
-
-              const cta =
-                scenario.lifecycleStatus === "Draft" ? "Continue" : "Launch";
+              const state = resolveScenarioUiState(scenario);
 
               return (
                 <article
@@ -319,12 +318,22 @@ export function InstructorHome() {
                 >
                   <h3>{scenario.title}</h3>
                   <p>{modelLabel(scenario.modelIdentifier)}</p>
-                  <p
-                    className={`scenario-status ${scenario.lifecycleStatus.toLowerCase()}`}
-                  >
-                    {statusLabel(scenario.lifecycleStatus)}
+                  <p className={`scenario-status ${state.teachingStatus}`}>
+                    {state.badgeLabel}
                   </p>
-                  <Link to={href}>{cta}</Link>
+                  {state.helperLabel && (
+                    <p className="muted">{state.helperLabel}</p>
+                  )}
+                  <div className="button-row">
+                    <Link to={state.primaryHref}>
+                      {state.primaryActionLabel}
+                    </Link>
+                    {state.secondaryActionLabel && state.secondaryHref && (
+                      <Link className="secondary" to={state.secondaryHref}>
+                        {state.secondaryActionLabel}
+                      </Link>
+                    )}
+                  </div>
                 </article>
               );
             })}
