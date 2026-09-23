@@ -160,6 +160,9 @@ export function ScenarioLibraryPage() {
         <Link className="button-link" to="/instructor/scenarios/create">
           Create Scenario
         </Link>
+        <Link className="button-link secondary" to="/instructor/scenarios/ai/new">
+          Create with AI
+        </Link>
       </header>
 
       <section className="library-toolbar" aria-label="Scenario filters">
