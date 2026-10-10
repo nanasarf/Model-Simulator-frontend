@@ -23,3 +23,10 @@ export interface SessionSetup {
   roleAssignments: Array<{ assignmentId: string; participantId: string; teamId: string; roleCode: string; effectiveCapabilities: string[] }>;
   readiness: { isReady: boolean; blockers: Array<{ code: string; participantId?: string; teamId?: string; [key: string]: JsonValue | undefined }> };
 }
+export type SessionSetupResponse = Omit<SessionSetup, 'teams' | 'participants' | 'availableRoles' | 'roleAssignments' | 'readiness'> & {
+  teams: SessionSetup['teams'] | null;
+  participants: SessionSetup['participants'] | null;
+  availableRoles: SessionSetup['availableRoles'] | null;
+  roleAssignments: SessionSetup['roleAssignments'] | null;
+  readiness: (Omit<SessionSetup['readiness'], 'blockers'> & { blockers: SessionSetup['readiness']['blockers'] | null }) | null;
+};

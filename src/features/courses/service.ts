@@ -1,6 +1,6 @@
 import type { ApiClient } from '../../lib/api/client';
 import type { IdResult, NamedCourseRequest, NameRequest, UserRequest } from '../../types/platform';
-import type { ClassroomDetail, ClassroomPage, ClassroomRosterEntry, ClassroomJoinRequest, SessionJoinRequest, SessionPage, SessionSetup, StudentSessionSummary, MyClassroomJoinRequest, MySessionJoinRequest, MyClassroom } from '../../types/classrooms';
+import type { ClassroomDetail, ClassroomPage, ClassroomRosterEntry, ClassroomJoinRequest, SessionJoinRequest, SessionPage, SessionSetup, SessionSetupResponse, StudentSessionSummary, MyClassroomJoinRequest, MySessionJoinRequest, MyClassroom } from '../../types/classrooms';
 /** Provisioning boundary only. No discovery endpoints are implemented by the backend. */
 export const courseService = (api: ApiClient) => ({
   create: (body: NamedCourseRequest) => api.json<IdResult>('/api/v1/courses', { method: 'POST', body }),
@@ -25,7 +25,17 @@ export const courseService = (api: ApiClient) => ({
   rejectSessionJoin: (sessionId: string, requestId: string) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/join-requests/${encodeURIComponent(requestId)}/reject`, { method: 'POST' }),
   sessions: (params: { page?: number; pageSize?: number; classroomId?: string; status?: string; modelIdentifier?: string } = {}, signal?: AbortSignal) => { const q = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 25) }); if (params.classroomId) q.set('classroomId', params.classroomId); if (params.status) q.set('status', params.status); if (params.modelIdentifier) q.set('modelIdentifier', params.modelIdentifier); return api.json<SessionPage>(`/api/v1/sessions?${q}`, { signal }); },
   mySessions: (signal?: AbortSignal) => api.json<StudentSessionSummary[]>('/api/v1/me/sessions', { signal }),
-  setup: (id: string, signal?: AbortSignal) => api.json<SessionSetup>(`/api/v1/sessions/${encodeURIComponent(id)}/setup`, { signal }),
+  setup: async (id: string, signal?: AbortSignal) => {
+    const value = await api.json<SessionSetupResponse>(`/api/v1/sessions/${encodeURIComponent(id)}/setup`, { signal });
+    return {
+      ...value,
+      teams: value.teams ?? [],
+      participants: value.participants ?? [],
+      availableRoles: value.availableRoles ?? [],
+      roleAssignments: value.roleAssignments ?? [],
+      readiness: { ...(value.readiness ?? { isReady: false }), blockers: value.readiness?.blockers ?? [] },
+    };
+  },
   createSession: (classroomId: string, body: { scenarioVersionId: string; seed: number }, idempotencyKey?: string) => api.json<IdResult>(`/api/v1/classrooms/${encodeURIComponent(classroomId)}/sessions`, { method: 'POST', body, idempotencyKey }),
   createTeam: (sessionId: string, name: string) => api.json<IdResult>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/teams`, { method: 'POST', body: { name } }),
   addMember: (sessionId: string, teamId: string, userId: string) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/teams/${encodeURIComponent(teamId)}/members`, { method: 'POST', body: { userId } }),
