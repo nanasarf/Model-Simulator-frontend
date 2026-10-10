@@ -9,12 +9,21 @@
   .authoring-layout { grid-template-columns: 1fr; }
   .step-nav { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .repeat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scenario-workspace { grid-template-columns: minmax(0, 1fr); }
+  .scenario-step-nav { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scenario-step-nav > .eyebrow, .scenario-step-nav > .muted, .scenario-step-nav > .notice { grid-column: 1 / -1; }
+  .scenario-assistant { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 600px) {
   .columns-2, .step-nav, .repeat-row { grid-template-columns: 1fr; }
   .editor-panel { padding: 1.2rem; }
   .step-nav button { min-height: 48px; }
+  .scenario-step-nav, .scenario-assistant, .revision-columns { grid-template-columns: 1fr; }
+  .scenario-step-nav > .eyebrow, .scenario-step-nav > .muted, .scenario-step-nav > .notice { grid-column: auto; }
+  .scenario-section, .scenario-step-nav { padding: 1.1rem; }
+  .prompt-examples button { width: 100%; }
+  .authoring-actions > button { flex: 1 1 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -23,4 +32,63 @@
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
   }
+}
+
+.scenario-authoring .prompt-card { max-width: 960px; margin-inline: auto; }
+.scenario-authoring textarea { width: 100%; min-height: 90px; resize: vertical; border: 1px solid #a9b9b8; background: #fff; border-radius: 8px; padding: .75rem; color: #233c3f; font: inherit; }
+.scenario-authoring select { width: 100%; min-height: 48px; border: 1px solid #a9b9b8; background: #fff; border-radius: 8px; padding: .7rem; font: inherit; color: #233c3f; }
+.prompt-intro { max-width: 62ch; margin-bottom: 1.5rem; }
+.prompt-intro h2 { font-size: 1.6rem; }
+.prompt-examples { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 1.5rem; }
+.prompt-examples button { font-size: .85rem; }
+.recommendation-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 1.25rem 0; padding: 1.2rem; border: 1px solid #c8d8cc; border-radius: 12px; background: #f0f5ed; }
+.recommendation-card h3 { margin-bottom: .4rem; }
+.authoring-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin: 1rem 0; }
+.authoring-progress { display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; border-radius: 9px; background: #edf3ef; color: #315b54; }
+.authoring-progress .loading-mark { flex: 0 0 30px; margin: 0; }
+.scenario-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr) 285px; gap: 1rem; align-items: start; }
+.scenario-step-nav { position: sticky; top: 1rem; display: flex; flex-direction: column; gap: .45rem; padding: 1rem; border: 1px solid #dce4de; background: #fff; border-radius: 14px; }
+.scenario-step-nav button { display: flex; align-items: center; justify-content: flex-start; gap: .65rem; min-height: 54px; padding: .55rem .65rem; color: #34595a; text-align: left; background: transparent; }
+.scenario-step-nav button:hover, .scenario-step-nav button.active { background: #e7f0e9; color: #154e4e; }
+.scenario-step-nav button small { display: block; color: #607573; font-weight: 400; font-size: .72rem; }
+.step-number { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border: 1px solid #b8c9c2; border-radius: 50%; font-size: .78rem; }
+.scenario-section { min-width: 0; }
+.section-editor { display: grid; gap: 1rem; }
+.section-editor > .form-field, .section-editor > label { min-width: 0; }
+.review-item { min-width: 0; padding: 1rem; border: 1px solid #dce4de; border-radius: 10px; background: #fbfcfa; }
+.review-item p:last-child { margin-bottom: 0; }
+.review-item input, .review-item textarea, .review-item select { margin-top: .35rem; }
+.role-grid { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.world-values { display: grid; gap: .7rem; }
+.world-value { padding: .8rem; border: 1px solid #dce4de; border-radius: 8px; background: #fbfcfa; }
+.world-value p { margin: .3rem 0 0; }
+.rule-card details { margin-top: 1rem; padding: .8rem; border-radius: 8px; background: #eff3ef; }
+.rule-card summary { cursor: pointer; font-weight: 650; }
+.rule-card pre { max-width: 100%; overflow: auto; padding: .8rem; border-radius: 7px; background: #fff; font-size: .76rem; }
+.scenario-assistant { display: grid; gap: .75rem; }
+.scenario-assistant .card { padding: 1.1rem; }
+.scenario-assistant h2 { font-size: 1.1rem; overflow-wrap: anywhere; }
+.review-progress { list-style: none; margin: 0; padding: 0; }
+.review-progress li { display: flex; justify-content: space-between; gap: .75rem; padding: .55rem 0; border-bottom: 1px solid #e9eeea; font-size: .8rem; }
+.review-progress li strong { text-align: right; font-size: .72rem; }
+.issue-link { display: block; min-height: 0; margin: .35rem 0; padding: .25rem 0; color: #195c60; text-align: left; text-decoration: underline; background: transparent; border: 0; font-weight: 500; }
+.issue-link:hover { color: #164749; background: transparent; }
+.section-ai-tools { margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #e2e9e4; }
+.section-actions { justify-content: flex-end; }
+.revision-review { margin: 1.5rem 0; padding: 1.1rem; border: 1px solid #d4b589; border-radius: 10px; background: #fffaf2; }
+.revision-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.revision-columns > div { min-width: 0; padding: .85rem; border: 1px solid #e4e8e1; border-radius: 8px; background: #fff; overflow-wrap: anywhere; }
+.revision-columns ul { padding-left: 1.2rem; }
+.final-review { grid-column: 2 / 4; }
+.validation-report { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #dce4de; }
+.confirmation-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: #142d2dcc; }
+.confirmation-dialog { width: min(100%, 540px); box-shadow: 0 18px 60px #122c2c55; }
+.confirmation-dialog button { margin: .4rem .5rem .1rem 0; }
+
+@media (max-width: 900px) {
+  .final-review { grid-column: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scenario-authoring *, .scenario-authoring *::before, .scenario-authoring *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }

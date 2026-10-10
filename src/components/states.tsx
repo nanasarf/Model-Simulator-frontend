@@ -6,8 +6,19 @@ export function EmptyState({ title, children }: { title: string; children?: Reac
 export function ErrorState({ error, retry }: { error: unknown; retry?: () => void }) {
   const problem = error instanceof ApiProblem ? error : null;
   const headings: Record<string, string> = { 'not-found': 'Resource unavailable', unauthorized: 'Access denied', unauthenticated: 'Sign in required', concurrency: 'A newer version is available', validation: 'Check your information', publication: 'Scenario is not ready to publish', readiness: 'Readiness requirement not met', idempotency: 'Submission conflict', 'missing-capability': 'This action is unavailable', lifecycle: 'Session state changed', duplicate: 'Already submitted', 'submission-limit': 'Submission limit reached' };
-  return <section className="state error" role="alert"><h2>{problem ? headings[problem.kind] || problem.title : 'Unable to connect'}</h2>
-    <p>{problem?.detail || (problem?.kind === 'not-found' ? 'This resource does not exist or is not available to your account.' : problem?.title) || 'The server could not be reached. Check your connection and try again.'}</p>
+  const codedTitle = (value: string | undefined) => !!value && /^[a-z_]+\.[a-z_.]+$/i.test(value);
+  const heading = !problem ? 'Unable to connect'
+    : headings[problem.kind]
+      || (problem.kind === 'unexpected' && codedTitle(problem.title) ? 'An unexpected error occurred' : problem.title);
+  const detail = problem?.detail
+    || (problem?.kind === 'not-found'
+      ? 'This resource does not exist or is not available to your account.'
+      : problem && codedTitle(problem.title)
+        ? 'Please try again. If the issue persists, contact support with the reference below.'
+        : problem?.title)
+    || 'The server could not be reached. Check your connection and try again.';
+  return <section className="state error" role="alert"><h2>{heading}</h2>
+    <p>{detail}</p>
     {problem && Object.entries(problem.fieldErrors).map(([field, errors]) => <p key={field}><strong>{field}: </strong>{errors.join(' ')}</p>)}
     {problem?.traceId && <p className="support-id">Support reference: <code>{problem.traceId}</code></p>}
     {retry && <button type="button" onClick={retry}>Try again</button>}

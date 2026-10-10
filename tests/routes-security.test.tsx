@@ -29,6 +29,17 @@ describe('protected routes', () => {
     const user = userEvent.setup(); await user.type(await screen.findByLabelText('Email address'), 'student@example.test'); await user.type(screen.getByLabelText('Password'), 'incorrect'); await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.'); expect(transport).toHaveBeenCalledTimes(1); queries.clear();
   });
+  it('shows a friendly fallback for coded unexpected backend errors', async () => {
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(json({ title: 'server.error', detail: 'An unexpected error occurred.', traceId: 'ABC123' }, 500));
+    const api = new ApiClient('', undefined, transport); const auth = new AuthSession(api, vault()); const queries = createQueryClient();
+    render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter><LoginPage/></MemoryRouter></RuntimeProvider>);
+    const user = userEvent.setup(); await user.type(await screen.findByLabelText('Email address'), 'student@example.test'); await user.type(screen.getByLabelText('Password'), 'incorrect'); await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('An unexpected error occurred');
+    expect(alert).toHaveTextContent('Support reference:');
+    expect(alert).toHaveTextContent('ABC123');
+    queries.clear();
+  });
   it('makes the shared instructor sign-in path explicit', async () => {
     const api = new ApiClient('', undefined, vi.fn<typeof fetch>()); const auth = new AuthSession(api, vault()); const queries = createQueryClient();
     render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter><LoginPage/></MemoryRouter></RuntimeProvider>);
