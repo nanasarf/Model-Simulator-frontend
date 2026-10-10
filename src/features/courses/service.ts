@@ -10,6 +10,7 @@ export const courseService = (api: ApiClient) => ({
   classrooms: (page = 1, pageSize = 25, signal?: AbortSignal) => api.json<ClassroomPage>(`/api/v1/classrooms?page=${page}&pageSize=${pageSize}`, { signal }),
   classroom: (id: string, signal?: AbortSignal) => api.json<ClassroomDetail>(`/api/v1/classrooms/${encodeURIComponent(id)}`, { signal }),
   roster: (id: string, signal?: AbortSignal) => api.json<ClassroomRosterEntry[]>(`/api/v1/classrooms/${encodeURIComponent(id)}/roster`, { signal }),
+  rotateClassroomJoinCode: (id: string) => api.json<{ classroomId: string; joinCode: string; active: boolean }>(`/api/v1/classrooms/${encodeURIComponent(id)}/join-code/rotate`, { method: 'POST', body: {} }),
   classroomJoinCode: (id: string, signal?: AbortSignal) => api.json<{ classroomId: string; joinCode: string; active: boolean }>(`/api/v1/classrooms/${encodeURIComponent(id)}/join-code`, { signal }),
   joinRequests: (id: string, signal?: AbortSignal) => api.json<ClassroomJoinRequest[]>(`/api/v1/classrooms/${encodeURIComponent(id)}/join-requests`, { signal }),
   requestClassroomJoin: (code: string) => api.json<{ requestId?: string; status: string; classroomId: string }>('/api/v1/classroom-join-requests', { method: 'POST', body: { code } }),
