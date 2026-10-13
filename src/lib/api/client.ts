@@ -6,7 +6,7 @@ export interface Credentials {
 }
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT'; body?: unknown; serializedBody?: string;
-  anonymous?: boolean; signal?: AbortSignal; idempotencyKey?: string;
+  anonymous?: boolean; accessToken?: string; signal?: AbortSignal; idempotencyKey?: string;
 }
 export class ApiClient {
   private refreshInFlight: Promise<string> | null = null;
@@ -22,7 +22,7 @@ export class ApiClient {
   private async response(path: string, options: RequestOptions): Promise<Response> {
     if (!path.startsWith('/api/v1/')) throw new Error('API requests must use a documented /api/v1/ path.');
     const body = options.serializedBody ?? (options.body === undefined ? undefined : JSON.stringify(options.body));
-    let token = options.anonymous ? null : await this.credentials?.getAccessToken();
+    let token = options.accessToken ?? (options.anonymous ? null : await this.credentials?.getAccessToken());
     const send = () => {
       options.signal?.throwIfAborted();
       const headers = new Headers({ Accept: 'application/json, application/problem+json, text/csv' });

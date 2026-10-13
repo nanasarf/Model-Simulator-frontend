@@ -37,24 +37,33 @@ export class AuthSession implements Credentials {
   subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   snapshot = () => this.state;
   private emit(status: AuthState['status'], user: CurrentUser | null = null) { this.state = { status, user }; this.listeners.forEach(f => f()); }
-  private accept(tokens: IssuedTokens) {
+  private async accept(tokens: IssuedTokens) {
     if (!validTokens(tokens)) throw sessionExpired();
-    const user = userFromTokens(tokens);
+    const generation = this.generation;
+    const claims = userFromTokens(tokens);
+    const session = await this.api.json<{ id: string; email: string | null; platformRoles: PlatformRole[] }>('/api/v1/auth/me', { anonymous: true, accessToken: tokens.accessToken });
+    if (generation !== this.generation) throw sessionExpired();
+    if (session.id !== claims.id || !Array.isArray(session.platformRoles) || session.platformRoles.some(r => !['Student', 'Instructor', 'PlatformAdministrator'].includes(r))) throw sessionExpired();
+    const user: CurrentUser = { id: session.id, roles: session.platformRoles, accessTokenExpiresAt: tokens.accessTokenExpiresAt };
     this.vault.write(tokens); this.tokens = tokens; this.emit('authenticated', user);
   }
   initialize() {
     return this.startup ??= (async () => {
       this.tokens = this.vault.read();
       if (!this.tokens) { this.emit('anonymous'); return; }
-      // No /me exists. Rotation validates persisted credentials before protected UI appears.
+      // Refresh and /me validate persisted credentials and current platform grants.
       try { await this.refresh(); } catch { /* refresh invalidates */ }
     })();
   }
   async login(request: LoginRequest) {
     const generation = ++this.generation;
-    const tokens = await this.api.json<IssuedTokens>('/api/v1/auth/login', { method: 'POST', body: request, anonymous: true });
-    if (generation === this.generation) this.accept(tokens);
+    this.tokens = null; this.vault.clear(); this.emit('loading');
+    try {
+      const tokens = await this.api.json<IssuedTokens>('/api/v1/auth/login', { method: 'POST', body: request, anonymous: true });
+      if (generation === this.generation) await this.accept(tokens);
+    } catch (error) { if (generation === this.generation) this.emit('anonymous'); throw error; }
   }
+
   register(request: RegisterRequest) {
     return this.api.json<RegisteredUser>('/api/v1/auth/register', { method: 'POST', body: request, anonymous: true });
   }
@@ -72,7 +81,7 @@ export class AuthSession implements Credentials {
       try {
         const tokens = await this.api.json<IssuedTokens>('/api/v1/auth/refresh', { method: 'POST', body: { refreshToken }, anonymous: true });
         if (generation !== this.generation) throw sessionExpired();
-        this.accept(tokens); return tokens.accessToken;
+        await this.accept(tokens); return tokens.accessToken;
       } catch (error) { if (generation === this.generation) this.invalidate(); throw error; }
       finally { this.rotation = null; }
     })();

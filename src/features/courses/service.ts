@@ -29,10 +29,10 @@ export const courseService = (api: ApiClient) => ({
     const value = await api.json<SessionSetupResponse>(`/api/v1/sessions/${encodeURIComponent(id)}/setup`, { signal });
     return {
       ...value,
-      teams: value.teams ?? [],
+      teams: (value.teams ?? []).map(t => ({ ...t, members: t.members ?? [] })),
       participants: value.participants ?? [],
-      availableRoles: value.availableRoles ?? [],
-      roleAssignments: value.roleAssignments ?? [],
+      availableRoles: (value.availableRoles ?? []).map(r => ({ ...r, capabilities: r.capabilities ?? [] })),
+      roleAssignments: (value.roleAssignments ?? []).map(r => ({ ...r, effectiveCapabilities: r.effectiveCapabilities ?? [] })),
       readiness: { ...(value.readiness ?? { isReady: false }), blockers: value.readiness?.blockers ?? [] },
     };
   },

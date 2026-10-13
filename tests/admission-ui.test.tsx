@@ -1,3 +1,4 @@
+import {sessionTransport} from './helpers';
 import {expect,it,vi} from 'vitest';
 import {render,screen,waitFor,within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -19,7 +20,7 @@ async function instructor(failure:number|null=null){
   if(path.endsWith('/roster')||path.endsWith('/join-requests'))return json([]);
   return json({classroomId:'class-1',name:'251',courseCode:'203',courseName:'Microeconomics'});
  });
- const api=new ApiClient('',undefined,transport),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'instructor@example.test',password:'test-fixture'});
+ const api=new ApiClient('',undefined,sessionTransport(transport)),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'instructor@example.test',password:'test-fixture'});
  render(<RuntimeProvider runtime={{api,auth,queries}}><MemoryRouter initialEntries={['/instructor/classrooms/class-1']}><Routes><Route path='/instructor/classrooms/:classroomId' element={<ClassroomDetailPage/>}/></Routes></MemoryRouter></RuntimeProvider>);
  return{calls,transport,queries,recover:()=>{failed=false;exists=true;},exists:()=>exists};
 }
@@ -41,7 +42,7 @@ async function student(options:{member?:boolean;pending?:boolean;rejected?:boole
   if(path.endsWith('/session-join-requests')){if(options.sessionFailure)return json({title:'session.classroom_membership_required',detail:'Approved classroom membership is required.',traceId:'trace-session'},422);sessionRequests=[{requestId:'session-request',sessionId:'session-1',status:'Pending',requestedAt:'2026-10-10T00:00:00Z'}];return json({requestId:'session-request',status:'Pending',sessionId:'session-1'},202);}
   throw Error('Unexpected admission endpoint '+path);
  });
- const api=new ApiClient('',undefined,transport),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'student@example.test',password:'test-fixture'});
+ const api=new ApiClient('',undefined,sessionTransport(transport)),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'student@example.test',password:'test-fixture'});
  const view=render(<RuntimeProvider runtime={{api,auth,queries}}><MemoryRouter><StudentHome/></MemoryRouter></RuntimeProvider>);return{calls,queries,view};
 }
 async function request(kind:'classroom'|'session'){const area=within((await screen.findByRole('heading',{name:kind==='classroom'?'Join a classroom':'Join a live session'})).closest('section')!);await userEvent.type(await area.findByLabelText(kind==='classroom'?'Classroom code':'Session code'),kind==='classroom'?'code1234':'session1');await userEvent.click(area.getByRole('button',{name:'Request to join'}));return area;}
@@ -54,7 +55,7 @@ it('allows rejected classroom requests to be retried under the existing backend 
 it('routes backend Draft sessions to admission setup',async()=>{
  const {InstructorSessionsPage}=await import('../src/features/instructor/sessions');
  const transport=vi.fn<typeof fetch>(async(input)=>String(input).endsWith('/auth/login')?json(tokens('Instructor')):json({items:[{sessionId:'draft-session',scenarioTitle:'Live economics',classroomName:'251',status:'Draft',currentRound:1,currentPhase:'Briefing'}],page:1,pageSize:25,totalCount:1}));
- const api=new ApiClient('',undefined,transport),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'instructor@example.test',password:'test-fixture'});
+ const api=new ApiClient('',undefined,sessionTransport(transport)),auth=new AuthSession(api,vault()),queries=createQueryClient();await auth.login({email:'instructor@example.test',password:'test-fixture'});
  render(<RuntimeProvider runtime={{api,auth,queries}}><MemoryRouter><InstructorSessionsPage/></MemoryRouter></RuntimeProvider>);
  expect(await screen.findByRole('link',{name:'Open setup'})).toHaveAttribute('href','/instructor/sessions/draft-session/setup');queries.clear();
 });

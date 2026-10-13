@@ -3,8 +3,8 @@ import type { SessionRecoveryView, HistoryItem, ReadinessRequest, AdvancePhaseRe
 /** Student recovery never imports or requests model instructor consoles. */
 export function studentSessionService(api: ApiClient) {
   return {
-    state: (id: string, signal?: AbortSignal) => api.json<SessionRecoveryView>(`/api/v1/sessions/${encodeURIComponent(id)}/state`, { signal }),
-    history: (id: string, signal?: AbortSignal) => api.json<HistoryItem[]>(`/api/v1/sessions/${encodeURIComponent(id)}/history`, { signal }),
+    state: (id: string, signal?: AbortSignal, view?: 'student' | 'instructor') => api.json<SessionRecoveryView>(`/api/v1/sessions/${encodeURIComponent(id)}/state${view ? `?view=${view}` : ''}`, { signal }),
+    history: (id: string, signal?: AbortSignal, view?: 'student' | 'instructor') => api.json<HistoryItem[]>(`/api/v1/sessions/${encodeURIComponent(id)}/history${view ? `?view=${view}` : ''}`, { signal }),
     participantReadiness: (id: string, body: ReadinessRequest) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(id)}/participants/me/readiness`, { method: 'PUT', body }),
     roundReadiness: (id: string, body: ReadinessRequest) => api.json<void>(`/api/v1/sessions/${encodeURIComponent(id)}/rounds/current/readiness`, { method: 'PUT', body }),
     submitAction: (id: string, body: SubmitActionRequest, idempotencyKey: string) => api.json<{ id: string }>(`/api/v1/sessions/${encodeURIComponent(id)}/actions`, { method: 'POST', body, idempotencyKey }),

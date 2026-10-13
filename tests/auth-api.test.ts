@@ -1,3 +1,4 @@
+import {sessionTransport} from './helpers';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiClient } from '../src/lib/api/client';
 import { AuthSession, userFromTokens } from '../src/lib/auth/session';
@@ -5,7 +6,7 @@ import { tokens, vault, json, userId } from './helpers';
 import { logicalOperation } from '../src/lib/idempotency';
 function setup(responses: Response[], initial = null as ReturnType<typeof tokens> | null) {
   const transport = vi.fn<typeof fetch>(); responses.forEach(r => transport.mockResolvedValueOnce(r));
-  const api = new ApiClient('', undefined, transport); const storage = vault(initial); const auth = new AuthSession(api, storage);
+  const api = new ApiClient('', undefined, sessionTransport(transport)); const storage = vault(initial); const auth = new AuthSession(api, storage);
   return { api, auth, storage, transport };
 }
 describe('authentication lifecycle', () => {
@@ -24,7 +25,7 @@ describe('authentication lifecycle', () => {
   it('startup stays loading until persisted refresh validates the current user', async () => {
     let finish!: (r: Response) => void;
     const transport = vi.fn<typeof fetch>(() => new Promise(r => { finish = r; }));
-    const auth = new AuthSession(new ApiClient('', undefined, transport), vault(tokens()));
+    const auth = new AuthSession(new ApiClient('', undefined, sessionTransport(transport)), vault(tokens()));
     const startup = auth.initialize(); expect(auth.snapshot().status).toBe('loading');
     finish(json(tokens('Student', 'rotated'))); await startup; expect(auth.snapshot().status).toBe('authenticated');
     expect(transport.mock.calls[0][0]).toBe('/api/v1/auth/refresh');

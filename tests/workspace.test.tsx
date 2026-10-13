@@ -1,3 +1,4 @@
+import {sessionTransport} from './helpers';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -22,11 +23,11 @@ describe('routed active workspace', () => {
     const transport = vi.fn<typeof fetch>(async input => {
       const path = String(input);
       if (path.endsWith('/auth/refresh')) return json(tokens('Student', 'rotated'));
-      if (path.endsWith('/state')) return json(latest);
-      if (path.endsWith('/history')) return json([]);
+      if (path.includes('/state')) return json(latest);
+      if (path.includes('/history')) return json([]);
       throw new Error(`Unexpected request: ${path}`);
     });
-    const api = new ApiClient('', undefined, transport); const auth = new AuthSession(api, vault(tokens())); const queries = createQueryClient();
+    const api = new ApiClient('', undefined, sessionTransport(transport)); const auth = new AuthSession(api, vault(tokens())); const queries = createQueryClient();
     const view = render(<RuntimeProvider runtime={{ api, auth, queries }}><MemoryRouter initialEntries={[`/simulation/${sessionId}`]}><AppRoutes/></MemoryRouter></RuntimeProvider>);
     expect(await screen.findByText('Decision')).toBeVisible(); expect(screen.getByText('BUYER')).toBeVisible(); expect(screen.getByText(recovery.teamId)).toBeVisible();
     expect(screen.getByText('Ready')).toBeVisible(); expect(screen.getByText(/Model-specific gameplay controls/)).toBeVisible();

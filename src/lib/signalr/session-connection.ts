@@ -11,7 +11,7 @@ export function createConnection(origin: string, accessTokenFactory: () => Promi
   return new HubConnectionBuilder().withUrl(`${origin}/hubs/sessions`, { accessTokenFactory })
     .withAutomaticReconnect([0, 2_000, 10_000, 30_000]).configureLogging(LogLevel.None).build();
 }
-/** One dedicated connection per mounted session. stop() also removes the backend's team group. */
+/** One dedicated connection per mounted session. Realtime invalidates; authorized HTTP supplies data. */
 export class SessionConnection {
   private disposed = false;
   private started = false;

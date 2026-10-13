@@ -48,8 +48,15 @@ export function ConnectionLabel({
   );
 }
 
-function workspaceForPath(pathname: string): WorkspaceMode {
-  return pathname.startsWith("/student") ? "Student" : "Instructor";
+export const WorkspaceContext = createContext<WorkspaceMode>('Student');
+export const useWorkspaceMode = () => useContext(WorkspaceContext);
+export function workspaceForPath(pathname: string, user: ReturnType<typeof useAuth>["user"], current?: WorkspaceMode): WorkspaceMode {
+  const instructor = isInstructor(user), student = hasPlatformRole(user, "Student");
+  if (!instructor) return "Student";
+  if (!student) return "Instructor";
+  if (pathname.startsWith("/student")) return "Student";
+  if (pathname.startsWith("/instructor")) return "Instructor";
+  return current ?? "Student"; // A shared runtime never silently switches an authorized workspace.
 }
 
 export function Shell() {
@@ -67,15 +74,15 @@ export function Shell() {
   const canUseStudent = hasPlatformRole(user, "Student");
 
   const [workspace, setWorkspace] = useState<WorkspaceMode>(
-    workspaceForPath(location.pathname),
+    workspaceForPath(location.pathname, user),
   );
 
   useEffect(() => {
-    const preferred = workspaceForPath(location.pathname);
+    const preferred = workspaceForPath(location.pathname, user, workspace);
     if (preferred !== workspace) {
       setWorkspace(preferred);
     }
-  }, [location.pathname, workspace]);
+  }, [location.pathname, user, workspace]);
 
   useEffect(() => {
     function closeOnOutsideClick(event: MouseEvent) {
@@ -131,7 +138,7 @@ export function Shell() {
   const professorLabel = workspace === "Instructor" ? "Professor" : "Student";
 
   return (
-    <ConnectionContext.Provider value={setConnection}>
+    <WorkspaceContext.Provider value={workspace}><ConnectionContext.Provider value={setConnection}>
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -262,6 +269,6 @@ export function Shell() {
           <ConnectionLabel status={connection} />
         </footer>
       </div>
-    </ConnectionContext.Provider>
+    </ConnectionContext.Provider></WorkspaceContext.Provider>
   );
 }

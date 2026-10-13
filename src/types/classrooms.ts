@@ -18,7 +18,7 @@ export interface SessionSetup {
   scenario: { id: string; title: string; publishedVersion: number };
   model: { identifier: string; version: string };
   teams: Array<{ teamId: string; name: string; members: string[] }>;
-  participants: Array<{ participantId: string; userId: string; teamId: string | null; isReady: boolean }>;
+  participants: Array<{ participantId: string; userId: string; teamId: string | null; isReady: boolean; displayName?: string | null; name?: string | null; email?: string | null }>;
   availableRoles: Array<{ code: string; name: string; minimumParticipants: number; maximumParticipants: number; capabilities: string[] }>;
   roleAssignments: Array<{ assignmentId: string; participantId: string; teamId: string; roleCode: string; effectiveCapabilities: string[] }>;
   readiness: { isReady: boolean; blockers: Array<{ code: string; participantId?: string; teamId?: string; [key: string]: JsonValue | undefined }> };
