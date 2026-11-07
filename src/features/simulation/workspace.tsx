@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom';
+import '../world/world.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, type UseMutationResult } from '@tanstack/react-query';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth, useRuntime } from '../../app/runtime';
 import { ConnectionLabel, useConnectionStatus, useWorkspaceMode } from '../../app/shell';
 import { LoadingState, ErrorState, BackgroundStatus } from '../../components/states';
@@ -13,12 +15,13 @@ import { recoverContext, SessionProvider } from './context';
 import type { JsonValue } from '../../types/platform';
 import { isInstructor } from '../../lib/permissions';
 import { resolveModelUI } from './registry';
+import { ApiProblem } from '../../lib/errors/problem';
 export function SimulationWorkspace() {
   const { sessionId = '' } = useParams();
   return isSessionId(sessionId) ? <ActiveSession key={sessionId} id={sessionId}/> : <section className="state"><h1>Invalid session ID</h1><p>Use the complete session ID provided by your instructor.</p></section>;
 }
 function ActiveSession({ id }: { id: string }) {
-  const { api, auth, queries } = useRuntime(); const { user } = useAuth(); const uid = user!.id;
+  const { api, auth, queries } = useRuntime(); const { user } = useAuth(); const uid = user!.id; const navigate = useNavigate();
   const platformWorkspace = useWorkspaceMode(); const instructorRuntime = platformWorkspace === 'Instructor' && isInstructor(user); const view = instructorRuntime ? 'instructor' : 'student';
   const setShellStatus = useConnectionStatus(); const [status, setStatus] = useState<ConnectionStatus>('disconnected');
   const [connectionError, setConnectionError] = useState<unknown>(); const [attempt, setAttempt] = useState(0); const [eventFilter, setEventFilter] = useState('All');
@@ -53,16 +56,20 @@ function ActiveSession({ id }: { id: string }) {
   // Service is stateless; the connection lifetime follows user/session, not query revisions.
   }, [api, auth, queries, uid, id, hasState, attempt, setShellStatus, view]);
   if (state.isPending) return <LoadingState label="Recovering your session"/>;
+  if (!instructorRuntime && state.isError && state.error instanceof ApiProblem && state.error.status === 404) {
+    return <section className="card" role="status"><p className="eyebrow">Session access ended</p><h1>You were removed from this session</h1><p>Your session access is no longer active. Your classroom enrollment has not changed.</p><button type="button" onClick={() => navigate('/student', { replace: true })}>Return to Student Home</button></section>;
+  }
   if (!state.data) return <ErrorState error={state.error} retry={() => void state.refetch()}/>;
   const context = recoverContext(state.data, uid);
   const waitingForLaunch = !instructorRuntime && (!context.teamId || !context.roleCodes.length || ['draft', 'setup', 'lobby', 'created', 'ready'].includes(context.status.toLowerCase()));
-  return <SessionProvider value={context}><header className="page-heading"><p className="eyebrow">Live classroom</p><h1>Simulation session</h1><p>{context.modelIdentifier} � Round {context.roundNumber}</p><ConnectionLabel status={status}/><BackgroundStatus active={state.isFetching}/></header>
+  return <SessionProvider value={context}><header className="page-heading"><p className="eyebrow">Live classroom</p><h1>Simulation session</h1><p>{context.modelIdentifier} � Round {context.roundNumber}</p><ConnectionLabel status={status}/><BackgroundStatus active={state.isFetching}/></header>
     {state.isError && <ErrorState error={state.error} retry={() => void state.refetch()}/>}
     {status !== 'connected' && <section className="notice" role="status"><h2>{status === 'reconnecting' ? 'Restoring live updates' : 'Live updates disconnected'}</h2><p>The last recovered state is shown. Your classroom session is preserved on the server.</p>{status === 'disconnected' && <button className="secondary" onClick={() => setAttempt(x => x + 1)}>Reconnect</button>}</section>}
     {connectionError !== undefined && <ErrorState error={connectionError}/>}
     {waitingForLaunch ? <StudentLobby context={context} participantReady={participantReady} /> : <dl className="session-facts"><div><dt>Status</dt><dd>{context.status}</dd></div><div><dt>Round</dt><dd>{context.roundNumber}</dd></div><div><dt>Phase</dt><dd>{context.phase}</dd></div><div><dt>Team ID</dt><dd>{context.teamId || 'Not assigned'}</dd></div><div><dt>Role</dt><dd>{context.roleCodes.join(', ') || 'Not assigned'}</dd></div><div><dt>Participant readiness</dt><dd>{context.participantReady === null ? 'Not a participant' : context.participantReady ? 'Ready' : 'Not ready'}</dd></div></dl>}
     {context.participant && !waitingForLaunch && <section className="card"><h2>Readiness</h2><div className="button-row"><button className="secondary" disabled={participantReady.isPending} onClick={() => participantReady.mutate(!context.participantReady)}>Mark {!context.participantReady ? 'ready' : 'not ready'}</button><button className="secondary" disabled={roundReady.isPending} onClick={() => roundReady.mutate(true)}>Mark round ready</button></div>{(participantReady.error || roundReady.error) && <ErrorState error={participantReady.error || roundReady.error}/>}</section>}
     {instructorRuntime && <section className="card"><h2>Instructor controls</h2><div className="button-row"><button disabled={command.isPending} onClick={() => command.mutate('start')}>Start</button><button className="secondary" disabled={command.isPending} onClick={() => command.mutate('pause')}>Pause</button><button className="secondary" disabled={command.isPending} onClick={() => command.mutate('resume')}>Resume</button>{context.teamId && <button className="secondary" disabled={execute.isPending} onClick={() => execute.mutate(context.teamId!)}>Execute round</button>}</div><label htmlFor="next-phase">Advance to phase</label><div className="input-row"><input id="next-phase" placeholder="Manifest phase"/><button className="secondary" disabled={advance.isPending} onClick={() => { const value=(document.getElementById('next-phase') as HTMLInputElement).value.trim(); if(value) advance.mutate(value); }}>Advance</button></div>{(command.error || advance.error || execute.error) && <ErrorState error={command.error || advance.error || execute.error}/>}</section>}
+    {!instructorRuntime && !waitingForLaunch && context.participant && <section className="card hv-entry"><div><p className="eyebrow">YOUR SESSION, IN CONTEXT</p><h2>Discover Honeyville</h2><p>Explore the hive, visit its facilities and inspect available market information.</p></div><Link className="button-link" to={`/student/sessions/${id}/world`}>Enter Honeyville ↗</Link></section>}
     {!instructorRuntime && context.availableActions.length > 0 && <ActionPanel context={context} service={service} sessionId={id} onSubmitted={() => void state.refetch()}/>} 
     {(() => { const ui = resolveModelUI(context.modelIdentifier, context.modelVersion); return ui ? <ui.Workspace projection={context.visibleState as never} /> : <section className="card"><h2>{context.modelIdentifier}:{context.modelVersion}</h2><p className="notice">This simulation model is not available in this client.</p><p className="muted">Model-specific gameplay controls will appear when this model adapter is registered.</p></section>; })()}
     <section className="recovery-note"><h2>Event history</h2><p>Session revision {context.version}. Events are filtered from the authorized server history.</p>{history.isPending ? <p role="status">Recovering history…</p> : history.isError ? <ErrorState error={history.error} retry={() => void history.refetch()}/> : <><label htmlFor="history-filter">Event type</label><select id="history-filter" value={eventFilter} onChange={e => setEventFilter(e.target.value)}>{eventTypes.map(type => <option key={type}>{type}</option>)}</select><p>{filteredHistory.length} authorized event{filteredHistory.length === 1 ? '' : 's'} shown.</p><ul>{filteredHistory.slice(0, 20).map(event => <li key={`${event.sequence}-${event.occurredAt}`}><strong>{event.type}</strong> · round {event.roundNumber} · {new Date(event.occurredAt).toLocaleString()}</li>)}</ul></>}</section>

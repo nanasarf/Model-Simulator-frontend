@@ -7,6 +7,6 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     server: { proxy: { '/api': { target }, '/hubs': { target, ws: true } } },
-    test: { environment: 'jsdom', setupFiles: ['./tests/setup.ts'], restoreMocks: true },
+    test: { exclude: ['e2e/**', 'node_modules/**', 'dist/**'], environment: 'jsdom', setupFiles: ['./tests/setup.ts'], restoreMocks: true },
   };
 });
