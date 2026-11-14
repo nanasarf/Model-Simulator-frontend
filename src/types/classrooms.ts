@@ -8,9 +8,8 @@ export interface SessionPage { items: SessionSummary[]; page: number; pageSize: 
 export interface StudentSessionSummary { sessionId: string; classroomId: string; classroomName: string; scenarioTitle: string; modelIdentifier: string; modelVersion: string; status: string; currentRound: number; currentPhase: string; teamId: string | null }
 export interface ClassroomDetail extends ClassroomSummary {}
 export interface ClassroomJoinRequest { id: string; classroomId: string; studentUserId: string; status: string; requestedAt: string; version: number }
-export interface SessionJoinRequest { id: string; sessionId: string; studentUserId: string; status: string; requestedAt: string; version: number }
+export interface ClassroomSession { sessionId: string; classroomId: string; classroomName: string; scenarioTitle: string; modelIdentifier: string; modelVersion: string; status: string; phase: string; currentRound: number; isOpen: boolean; isReadOnly: boolean; canJoin: boolean; participationStatus: string; teamId: string | null; teamName: string | null; roleCode: string | null; isReady: boolean }
 export interface MyClassroomJoinRequest { requestId: string; classroomId: string; classroomName: string; status: string; requestedAt: string; resolvedAt: string | null }
-export interface MySessionJoinRequest { requestId: string; sessionId: string; classroomId: string; status: string; requestedAt: string; resolvedAt: string | null }
 export interface MyClassroom { classroomId: string; name: string; enrolledAt: string }
 export interface SessionSetup {
   session: { id: string; status: string; currentRound: number; currentPhase: string; version: number };

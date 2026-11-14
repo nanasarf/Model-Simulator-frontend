@@ -5,7 +5,7 @@ export interface Credentials {
   invalidate(): void;
 }
 export interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT'; body?: unknown; serializedBody?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; serializedBody?: string;
   anonymous?: boolean; accessToken?: string; signal?: AbortSignal; idempotencyKey?: string;
 }
 export class ApiClient {

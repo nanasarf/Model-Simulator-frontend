@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { useAuth, useRuntime } from "../../app/runtime";
 import { keys } from "../../lib/api/query";
@@ -79,16 +79,6 @@ export function InstructorHome() {
       ),
     [sessions.data?.items],
   );
-
-  const joinCodeQueries = useQueries({
-    queries: liveSessions.slice(0, 2).map((session) => ({
-      queryKey: ["session", user!.id, session.sessionId, "join-code", "home"],
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        courseService(api).joinCode(session.sessionId, signal),
-      staleTime: 15_000,
-      retry: false,
-    })),
-  });
 
   const recentScenarios = (scenarios.data?.items ?? []).slice(0, 4);
   const readyScenario = (scenarios.data?.items ?? []).find(
@@ -170,7 +160,7 @@ export function InstructorHome() {
           <ol>
             <li>Choose a simulation type</li>
             <li>Prepare a scenario</li>
-            <li>Launch it with a join code</li>
+            <li>Launch it for your classroom</li>
           </ol>
           <div className="button-row">
             <Link className="button-link" to="/instructor/scenarios/create">
@@ -254,15 +244,12 @@ export function InstructorHome() {
         {liveSessions.length === 0 ? (
           <EmptyState title="No live sessions right now">
             <p>
-              Launch a simulation to open a lobby and share a join code with
-              students.
+              Launch a simulation to open a lobby for your classroom.
             </p>
           </EmptyState>
         ) : (
           <div className="card-grid live-grid">
-            {liveSessions.slice(0, 2).map((session, index) => {
-              const join = joinCodeQueries[index];
-              const joinCode = join?.data?.joinCode ?? null;
+            {liveSessions.slice(0, 2).map((session) => {
               return (
                 <article
                   className="card live-session-card"
@@ -277,11 +264,6 @@ export function InstructorHome() {
                   <p className="muted">
                     Round {session.currentRound} • {session.currentPhase}
                   </p>
-                  {joinCode && (
-                    <p className="session-code">
-                      Session code <strong>{joinCode}</strong>
-                    </p>
-                  )}
                   <Link
                     to={
                       session.status.toLowerCase() === "draft"

@@ -5,7 +5,6 @@ import { useAuth, useRuntime } from '../../app/runtime';
 import { courseService } from '../courses/service';
 import { keys } from '../../lib/api/query';
 import { ErrorState, LoadingState } from '../../components/states';
-import { SessionAdmissionQueue } from './session-admission';
 import '../../app/session-setup.css';
 
 export function Pagination({ page, pageSize, totalCount, onPage }: { page: number; pageSize: number; totalCount: number; onPage: (page: number) => void }) {
@@ -25,7 +24,6 @@ export function SessionSetupPage() {
   const { api } = useRuntime(); const { user } = useAuth(); const { sessionId = '' } = useParams(); const qc = useQueryClient(); const s = courseService(api);
   const setupKey = keys.setup(user!.id, sessionId);
   const setup = useQuery({ queryKey: setupKey, queryFn: ({ signal }) => s.setup(sessionId, signal), enabled: !!sessionId });
-  const code = useQuery({ queryKey: ['user', user!.id, 'session', sessionId, 'join-code'], queryFn: ({ signal }) => s.joinCode(sessionId, signal), enabled: !!sessionId });
   const [teamName, setTeamName] = useState('');
   const refresh = () => { void qc.invalidateQueries({ queryKey: setupKey }).catch(() => undefined); };
   // Keep mutation completion tied to the POST. Background setup recovery must
@@ -52,8 +50,7 @@ export function SessionSetupPage() {
   const mutationError = assignTeam.error || removeTeam.error ? 'This student’s team assignment changed. Refreshing setup.' : role.error || unrole.error ? 'This role is not available for this session. Refreshing setup.' : undefined;
   return <main>
     <header className="page-heading"><h1>{data.scenario.title}</h1><p>{data.classroom.name} · {data.session.status} · Round {data.session.currentRound} · {data.session.currentPhase}</p></header>
-    <section className="card"><p className="eyebrow">Session code</p>{code.isPending ? <p>Loading code…</p> : code.isError ? <button type="button" onClick={() => void code.refetch()}>Retry</button> : <><strong className="join-code">{code.data.joinCode}</strong><button type="button" className="secondary" onClick={() => void navigator.clipboard?.writeText(code.data.joinCode)}>Copy code</button></>}<p>Students use this code to request access to this session.</p></section>
-    <SessionAdmissionQueue sessionId={sessionId} />
+    <section className="card"><h2>Classroom access</h2><p>Students join the classroom using its classroom code. Classroom members can join when the session is open.</p></section>
     {mutationError && <p role="alert">{mutationError}</p>}
     <section className="card"><h2>Setup summary</h2><p>{participants.length} participants · {participants.length - unassigned.length} assigned to teams · {assignedRoleCount} assigned roles · {readyCount} ready</p>{availableRoles.length === 0 && <p role="alert">No simulation roles are available for this session.</p>}</section>
     <section className="card"><h2>Unassigned Participants</h2>{participants.length === 0 ? <p className="muted">No students have joined this session yet.</p> : unassigned.length === 0 ? <p className="muted">All participants have been assigned to teams.</p> : <><p className="muted">Assign these students to teams.</p>{unassigned.map(p => <ParticipantRow key={p.participantId} name={displayName(p)} teamLabel="No team" roleLabel="No role" readiness={p.isReady} teams={teams} value="" onTeam={teamId => assignTeam.mutate({ participantId: p.userId, teamId, currentTeamId: null })} />)}</>}</section>

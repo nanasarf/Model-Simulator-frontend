@@ -13,4 +13,6 @@ Node 22 is used for verification. Copy `.env.example` to `.env.local` if the bac
 
 Sign in with an existing Instructor or Student account, or register a Student account. An instructor must provision classroom/session membership. Open sessions using existing session IDs; the backend has no session or owned-scenario list APIs.
 
+The current backend uses classroom codes and open-session admission, not session codes. Students join a classroom with its code, then join any open session from their home page; instructors open a session from its setup page.
+
 See [frontend architecture and contract mismatches](docs/frontend-architecture.md). Complete milestone acceptance remains blocked by missing session model/capability/readiness/submission metadata and a backend market-projection privacy defect. The frontend does not guess or fabricate that context.

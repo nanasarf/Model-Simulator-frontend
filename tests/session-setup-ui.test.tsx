@@ -22,7 +22,6 @@ async function mountSetup(initial: { teams?: unknown[] | null; participants?: un
     const path = String(input); const method = init?.method ?? 'GET';
     calls.push({ path, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (path.endsWith('/auth/login')) return json(tokens('Instructor'));
-    if (path.endsWith('/join-code')) return json({ sessionId, joinCode: 'SESSION1', active: true });
     if (path.endsWith('/join-requests')) return json([]);
     if (path.endsWith('/setup') && method === 'GET') { if (stallNextSetup) return new Promise<Response>(() => {}); return json({ ...base, teams, participants, availableRoles: [role], roleAssignments, readiness: { isReady: false, blockers: [{ code: 'setup_incomplete' }] } }); }
     if (path.endsWith('/teams') && method === 'POST') { if (initial.delayTeamCreate) await new Promise(resolve => setTimeout(resolve, 50)); if (initial.failTeamCreate) return json({ title: 'Team failed', detail: 'Team could not be created.' }, 500); const newTeam = { teamId: 'team-a', name: (calls.at(-1)?.body as { name: string }).name, members: [] }; teams = [...teams, newTeam]; stallNextSetup = !!initial.stallSetupAfterCreate; return json({ id: newTeam.teamId }, 201); }
@@ -42,6 +41,8 @@ describe('instructor session setup', () => {
   it('distinguishes no admitted participants from all participants assigned', async () => {
     const empty = await mountSetup();
     expect(await screen.findByText('No students have joined this session yet.')).toBeVisible();
+    expect(screen.getByText('Students join the classroom using its classroom code. Classroom members can join when the session is open.')).toBeVisible();
+    expect(empty.calls.some(call => call.path.endsWith('/join-code'))).toBe(false);
     expect(screen.queryByText('All participants have been assigned to teams.')).toBeNull();
     empty.view.unmount(); empty.queries.clear();
 
