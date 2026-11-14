@@ -17,6 +17,7 @@ import { loadBootstrap,type WorldBootstrap } from './contracts';
 import { WorldBridge } from './bridge';
 import { PhaserWorld } from './PhaserWorld';
 import './world.css';
+import { createWorldConnection,WorldPresenceClient,type PresenceView } from './presence';
 
 export const honeyville=parseHoneyville(rawMap);
 export default function HoneyvillePage(){const {sessionId=''}=useParams();return isSessionId(sessionId)?<AuthorizedWorld key={sessionId} id={sessionId}/>:<section className="state"><h1>Invalid session ID</h1><p>Open Honeyville from an authorized session.</p></section>;}
@@ -42,6 +43,7 @@ function AuthorizedWorld({id}:{id:string}){
   if(state.isPending)return <LoadingState label="Confirming session access"/>;
   if(state.isError||!state.data)return <><ErrorState error={state.error} retry={()=>void state.refetch()}/>{back}</>;
   const context=recoverContext(state.data,uid);
+  if(['completed','terminated','deleted'].includes(context.status.toLowerCase()))return <section className="state"><h1>This session has ended</h1>{back}</section>;
   if(!context.participant||!context.teamId||!context.roleCodes.length||['draft','setup','lobby','created','ready'].includes(context.status.toLowerCase()))return <section className="state"><h1>Honeyville is waiting</h1><p>Join a team and role, then wait for your instructor to start this session.</p>{back}</section>;
   if(bootstrap.isPending)return <LoadingState label="Recovering the world projection"/>;
   if(bootstrap.isError||!bootstrap.data)return <><ErrorState error={bootstrap.error} retry={()=>void bootstrap.refetch()}/>{back}</>;
@@ -49,9 +51,21 @@ function AuthorizedWorld({id}:{id:string}){
 }
 
 function HoneyvilleExperience({bootstrap,round,phase,role,status,connection,onRefresh,refreshing,back}:{bootstrap:WorldBootstrap;round:number;phase:string;role:string;status:string;connection:ConnectionStatus;onRefresh:()=>void;refreshing:boolean;back:React.ReactNode}){
+  const {api,auth}=useRuntime();
+  const [presence,setPresence]=useState<PresenceView>({status:'connecting',count:0,controlled:false});
+  const presenceClient=useRef<WorldPresenceClient|null>(null);
   const bridge=useMemo(()=>new WorldBridge(),[]);const [nearby,setNearby]=useState<string|null>(null);const [panel,setPanel]=useState<string|null>(null);
   const nearRef=useRef<string|null>(null);const close=useRef<HTMLButtonElement>(null);
   const paused=status.toLowerCase()==='paused';
+  const presenceSession=bootstrap.snapshot?.sessionId;
+  useEffect(()=>{
+    if(!presenceSession)return;
+    const hub=createWorldConnection(api.origin,async()=>{const token=await auth.getAccessToken();if(!token)throw sessionExpired();return token;});
+    let active=true;const client=new WorldPresenceClient(hub,presenceSession,bridge,value=>{if(active)setPresence(value);});presenceClient.current=client;
+    client.setPaused(paused);void client.start();
+    return()=>{active=false;presenceClient.current=null;void client.dispose().catch(()=>{});};
+  },[api,auth,bridge,presenceSession]);
+  useEffect(()=>{presenceClient.current?.setPaused(paused);},[paused]);
   useEffect(()=>{
     const offNear=bridge.on('nearby',id=>{nearRef.current=id;setNearby(id);});
     const offInteract=bridge.on('interact',id=>{if(nearRef.current===id)setPanel(id);});
@@ -63,7 +77,8 @@ function HoneyvilleExperience({bootstrap,round,phase,role,status,connection,onRe
   function dismiss(){setPanel(null);document.querySelector<HTMLCanvasElement>('.hv-canvas canvas')?.focus({preventScroll:true});}
   return <section className="honeyville" aria-labelledby="honeyville-title">
     <header className="hv-heading"><div><p className="eyebrow">MODEL SIMULATOR / FIELD STATION 01</p><h1 id="honeyville-title">Honeyville<span aria-hidden="true">.</span></h1><p>A shared setting. A closer view of your decisions.</p></div>{back}</header>
-    <div className="hv-statusbar"><span className="hv-world-label"><span className="hv-live-dot"/> LOCAL EXPLORATION</span><span>Round <strong>{round}</strong></span><span>{phase}</span><span>{role.replaceAll('_',' ')}</span><span className="hv-network">{connection==='connected'?'Session linked':connection==='reconnecting'?'Reconnecting…':'Live updates unavailable'}</span></div>
+    <div className="hv-statusbar"><span className="hv-world-label"><span className="hv-live-dot"/> {presenceSession?'SHARED EXPLORATION':'LOCAL EXPLORATION'}</span><span>Round <strong>{round}</strong></span><span>{phase}</span><span>{role.replaceAll('_',' ')}</span><span className="hv-network">{connection==='connected'?'Session linked':connection==='reconnecting'?'Reconnecting…':'Live updates unavailable'}</span></div>
+    {presenceSession&&<p className="hv-presence" role="status">{presence.status==='connected'?`${presence.count} ${presence.count===1?'bee':'bees'} connected${presence.controlled?'':' · Observing; another tab may control movement'}`:presence.status==='unavailable'?'Multiplayer unavailable':presence.status==='reconnecting'?'Reconnecting to the hive…':'Connecting to the hive…'}{presence.status==='connected'&&!presence.controlled&&<button className="text-button" onClick={()=>void presenceClient.current?.claimControl()}>Check movement control</button>}{presence.status==='unavailable'&&<button className="text-button" onClick={()=>void presenceClient.current?.retry()}>Reconnect</button>}</p>}
     {paused&&<p className="hv-notice" role="status">Your instructor has paused the session. Exploration will resume with the session.</p>}
     {bootstrap.status!=='ready'&&<p className="hv-notice" role="status">{bootstrap.status==='not-bound'?'This scenario has no world projection. You can explore Honeyville; authoritative market data is unavailable.':'World projection is unavailable for this scenario. The town remains informational; no model values are being substituted.'}</p>}
     <div className="hv-layout"><div className="hv-stage">

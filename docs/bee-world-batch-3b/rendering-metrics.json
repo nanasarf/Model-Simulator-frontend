@@ -1,0 +1,11 @@
+{
+  "frames": 119,
+  "fps": 23.690078037904996,
+  "p95ms": 48.69999999999982,
+  "heapBytes": 43375054,
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0",
+  "hardwareConcurrency": 12,
+  "simulatedEventBatches": 44,
+  "simulatedActorEvents": 1276,
+  "simulatedIntervalMs": 100
+}
