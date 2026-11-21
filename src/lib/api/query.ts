@@ -19,6 +19,7 @@ export const keys = {
   myClassroomJoinRequests: (userId: string) => ['user', userId, 'my-classroom-join-requests'] as const,
   classroomSessions: (userId: string, classroomId: string) => ['user', userId, 'classroom', classroomId, 'sessions'] as const,
   setup: (userId: string, id: string) => ['user', userId, 'session', id, 'setup'] as const,
+  lobby: (userId:string,id:string)=>['user',userId,'session',id,'lobby'] as const,
   scenario: (userId: string, model: string, id: string) => ['user', userId, 'scenario', model, id] as const,
   readiness: (userId: string, model: string, id: string) => ['user', userId, 'scenario', model, id, 'readiness'] as const,
   sessions: (userId: string) => ['user', userId, 'sessions'] as const, // Reserved: no endpoint.

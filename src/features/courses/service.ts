@@ -1,7 +1,8 @@
 import type { ApiClient } from '../../lib/api/client';
 import type { IdResult, NamedCourseRequest, NameRequest, UserRequest } from '../../types/platform';
+import type { SessionLobbyView } from '../../types/classrooms';
 import type { ClassroomDetail, ClassroomPage, ClassroomRosterEntry, ClassroomJoinRequest, ClassroomSession, SessionPage, SessionSetup, SessionSetupResponse, StudentSessionSummary, MyClassroomJoinRequest, MyClassroom } from '../../types/classrooms';
-/** Provisioning boundary only. No discovery endpoints are implemented by the backend. */
+/** Authenticated classroom/session workflow; the backend owns admission and role rules. */
 export const courseService = (api: ApiClient) => ({
   create: (body: NamedCourseRequest) => api.json<IdResult>('/api/v1/courses', { method: 'POST', body }),
   createClassroom: (courseId: string, body: NameRequest) => api.json<IdResult>(`/api/v1/courses/${encodeURIComponent(courseId)}/classrooms`, { method: 'POST', body }),
@@ -22,6 +23,10 @@ export const courseService = (api: ApiClient) => ({
   sessions: (params: { page?: number; pageSize?: number; classroomId?: string; status?: string; modelIdentifier?: string } = {}, signal?: AbortSignal) => { const q = new URLSearchParams({ page: String(params.page ?? 1), pageSize: String(params.pageSize ?? 25) }); if (params.classroomId) q.set('classroomId', params.classroomId); if (params.status) q.set('status', params.status); if (params.modelIdentifier) q.set('modelIdentifier', params.modelIdentifier); return api.json<SessionPage>(`/api/v1/sessions?${q}`, { signal }); },
   classroomSessions: (classroomId: string, signal?: AbortSignal) => api.json<ClassroomSession[]>(`/api/v1/classrooms/${encodeURIComponent(classroomId)}/sessions`, { signal }),
   joinOpenSession: (sessionId: string) => api.json<unknown>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/join`, { method: 'POST', body: {} }),
+  lobby: (sessionId:string,signal?:AbortSignal)=>api.json<SessionLobbyView>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/lobby`,{signal}),
+  selectTeam: (sessionId:string,teamId:string)=>api.json<SessionLobbyView>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/participants/me/team`,{method:'PUT',body:{teamId}}),
+  selectRole: (sessionId:string,roleCode:string)=>api.json<SessionLobbyView>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/participants/me/role`,{method:'PUT',body:{roleCode}}),
+  setSessionOpen: (sessionId:string,open:boolean)=>api.json<void>(`/api/v1/sessions/${encodeURIComponent(sessionId)}/${open?'open':'close'}`,{method:'POST'}),
   mySessions: (signal?: AbortSignal) => api.json<StudentSessionSummary[]>('/api/v1/me/sessions', { signal }),
   setup: async (id: string, signal?: AbortSignal) => {
     const value = await api.json<SessionSetupResponse>(`/api/v1/sessions/${encodeURIComponent(id)}/setup`, { signal });

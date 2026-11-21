@@ -466,7 +466,7 @@ export function PublishedVersionPage() {
             ))}
           </select>
 
-          <p className="muted">Students will join using a session code.</p>
+          <p className="muted">Classroom members can join after you create a team and open this session for students. They can choose a role, or you can assign one.</p>
 
           <div className="button-row">
             <Link className="secondary" to="/instructor/scenarios">

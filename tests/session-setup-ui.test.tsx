@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor,within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ApiClient } from '../src/lib/api/client';
@@ -12,18 +12,20 @@ import { json, sessionId, sessionTransport, tokens, vault } from './helpers';
 const base = { session: { id: sessionId, status: 'Draft', currentRound: 1, currentPhase: 'Briefing', version: 1 }, classroom: { id: 'class-1', name: 'Economics 101' }, scenario: { id: 'scenario-1', title: 'Market Simulation', publishedVersion: 1 }, model: { identifier: 'Economics.ShortRunMacro', version: '1.0.0' }, readiness: { isReady: false, blockers: [{ code: 'not_ready' }] } };
 const role = { code: 'GOV', name: 'Government', minimumParticipants: 1, maximumParticipants: 1, capabilities: [] };
 
-async function mountSetup(initial: { teams?: unknown[] | null; participants?: unknown[] | null; roleAssignments?: unknown[] | null; failTeamCreate?: boolean; stallSetupAfterCreate?: boolean; delayTeamCreate?: boolean } = {}) {
+async function mountSetup(initial: { teams?: unknown[] | null; participants?: unknown[] | null; roleAssignments?: unknown[] | null; failTeamCreate?: boolean; stallSetupAfterCreate?: boolean; delayTeamCreate?: boolean;status?:string } = {}) {
   let teams = initial.teams ?? [];
   let participants = initial.participants ?? [];
   let roleAssignments = initial.roleAssignments ?? [];
   let stallNextSetup = false;
+  let isOpen=false;
   const calls: Array<{ path: string; method: string; body?: unknown }> = [];
   const transport = vi.fn<typeof fetch>(async (input, init) => {
     const path = String(input); const method = init?.method ?? 'GET';
     calls.push({ path, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
     if (path.endsWith('/auth/login')) return json(tokens('Instructor'));
     if (path.endsWith('/join-requests')) return json([]);
-    if (path.endsWith('/setup') && method === 'GET') { if (stallNextSetup) return new Promise<Response>(() => {}); return json({ ...base, teams, participants, availableRoles: [role], roleAssignments, readiness: { isReady: false, blockers: [{ code: 'setup_incomplete' }] } }); }
+    if (path.endsWith('/setup') && method === 'GET') { if (stallNextSetup) return new Promise<Response>(() => {}); return json({ ...base,session:{...base.session,status:initial.status??'Draft',isOpen}, teams, participants, availableRoles: [role], roleAssignments, readiness: { isReady: false, blockers: [{ code: 'setup_incomplete' }] } }); }
+    if(path.endsWith('/open')||path.endsWith('/close')){isOpen=path.endsWith('/open');return new Response(null,{status:204});}
     if (path.endsWith('/teams') && method === 'POST') { if (initial.delayTeamCreate) await new Promise(resolve => setTimeout(resolve, 50)); if (initial.failTeamCreate) return json({ title: 'Team failed', detail: 'Team could not be created.' }, 500); const newTeam = { teamId: 'team-a', name: (calls.at(-1)?.body as { name: string }).name, members: [] }; teams = [...teams, newTeam]; stallNextSetup = !!initial.stallSetupAfterCreate; return json({ id: newTeam.teamId }, 201); }
     if (path.endsWith('/teams/team-a/members')) { const body = calls.at(-1)?.body as { userId: string }; participants = participants.map((p: any) => p.userId === body.userId ? { ...p, teamId: 'team-a' } : p); return new Response(null, { status: 204 }); }
     if (path.includes('/participants/') && path.endsWith('/move')) { const userId = path.split('/participants/')[1].split('/')[0]; const target = (calls.at(-1)?.body as { targetTeamId: string }).targetTeamId; participants = participants.map((p: any) => p.userId === userId ? { ...p, teamId: target } : p); return new Response(null, { status: 204 }); }
@@ -38,6 +40,26 @@ async function mountSetup(initial: { teams?: unknown[] | null; participants?: un
 }
 
 describe('instructor session setup', () => {
+  it('opens a classroom session for student entry after a team exists',async()=>{
+    const s=await mountSetup({teams:[{teamId:'team-a',name:'Team A',members:[]}]});
+    await userEvent.click(await screen.findByRole('button',{name:'Open session for students'}));
+    expect(await screen.findByText('Open for classroom members')).toBeVisible();expect(s.calls.some(c=>c.path.endsWith('/open')&&c.method==='POST')).toBe(true);s.view.unmount();s.queries.clear();
+  });
+  it('assigns an entered student to a team and a scenario role',async()=>{
+    const s=await mountSetup({teams:[{teamId:'team-a',name:'Team A',members:[]}],participants:[{participantId:'participant-1',userId:'student-1',teamId:null,isReady:false,displayName:'Alice'}]});
+    expect(await screen.findByLabelText('Simulation role for Alice')).toBeDisabled();
+    await userEvent.selectOptions(screen.getByLabelText('Team for Alice'),'team-a');await waitFor(()=>expect(screen.getByLabelText('Simulation role for Alice')).toBeEnabled());
+    await userEvent.selectOptions(screen.getByLabelText('Simulation role for Alice'),'GOV');await waitFor(()=>expect(screen.getByLabelText('Simulation role for Alice')).toHaveValue('GOV'));
+    expect(s.calls.find(c=>c.path.endsWith('/role-assignments'))?.body).toEqual({teamId:'team-a',userId:'student-1',roleCode:'GOV'});s.view.unmount();s.queries.clear();
+  });
+  it('disables roles already taken by another participant on the same team',async()=>{
+    const s=await mountSetup({teams:[{teamId:'team-a',name:'Team A',members:[]}],participants:[{participantId:'participant-1',userId:'student-1',teamId:'team-a',isReady:false,displayName:'Alice'},{participantId:'participant-2',userId:'student-2',teamId:'team-a',isReady:false,displayName:'Bob'}],roleAssignments:[{assignmentId:'a1',participantId:'participant-1',teamId:'team-a',roleCode:'GOV'}]});
+    const bob=await screen.findByLabelText('Simulation role for Bob');expect(within(bob).getByRole('option',{name:'Government · Taken'})).toBeDisabled();expect(within(screen.getByLabelText('Simulation role for Alice')).getByRole('option',{name:'Government'})).toBeEnabled();s.view.unmount();s.queries.clear();
+  });
+  it('locks instructor role editing after a game starts',async()=>{
+    const s=await mountSetup({status:'Running',teams:[{teamId:'team-a',name:'Team A',members:[]}],participants:[{participantId:'participant-1',userId:'student-1',teamId:'team-a',isReady:false,displayName:'Alice'}]});
+    expect(await screen.findByLabelText('Simulation role for Alice')).toBeDisabled();expect(screen.getByRole('button',{name:'Start session'})).toBeDisabled();expect(screen.getByText('Team and role assignments are locked after the game starts.')).toBeVisible();s.view.unmount();s.queries.clear();
+  });
   it('distinguishes no admitted participants from all participants assigned', async () => {
     const empty = await mountSetup();
     expect(await screen.findByText('No students have joined this session yet.')).toBeVisible();

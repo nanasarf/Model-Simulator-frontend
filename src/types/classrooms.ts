@@ -12,7 +12,7 @@ export interface ClassroomSession { sessionId: string; classroomId: string; clas
 export interface MyClassroomJoinRequest { requestId: string; classroomId: string; classroomName: string; status: string; requestedAt: string; resolvedAt: string | null }
 export interface MyClassroom { classroomId: string; name: string; enrolledAt: string }
 export interface SessionSetup {
-  session: { id: string; status: string; currentRound: number; currentPhase: string; version: number };
+  session: { id: string; status: string; currentRound: number; currentPhase: string; version: number; isOpen?: boolean; isReadOnly?: boolean };
   classroom: { id: string; name: string };
   scenario: { id: string; title: string; publishedVersion: number };
   model: { identifier: string; version: string };
@@ -29,3 +29,16 @@ export type SessionSetupResponse = Omit<SessionSetup, 'teams' | 'participants' |
   roleAssignments: SessionSetup['roleAssignments'] | null;
   readiness: (Omit<SessionSetup['readiness'], 'blockers'> & { blockers: SessionSetup['readiness']['blockers'] | null }) | null;
 };
+
+/** Backend WorkflowContracts.SessionLobbyView and its nested public lobby records. */
+export interface SessionLobbyView {
+  sessionId:string;status:string;phase:string;isOpen:boolean;isReadOnly:boolean;version:number;
+  classroomId:string;classroomName:string;scenarioTitle:string;modelIdentifier:string;modelVersion:string;
+  canJoin:boolean;canChangeSelection:boolean;participationStatus:string;
+  participation:{participantId:string;teamId:string|null;roleCode:string|null;isReady:boolean}|null;
+  roleTemplate:{code:string;name:string;minimum:number;maximum:number}[];
+  teams:{teamId:string;name:string;capacity:number;memberCount:number;isFull:boolean;isMine:boolean;
+    members:{memberId:string;displayName:string;roleCode:string|null}[];
+    roles:{code:string;name:string;maximum:number;taken:number;available:number}[];
+  }[];
+}

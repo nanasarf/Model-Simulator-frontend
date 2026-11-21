@@ -101,6 +101,7 @@ export function Shell() {
     if (workspace === "Student") {
       return [
         { to: "/student", icon: "⌂", label: "Home", end: true },
+        { to: "/student/classrooms", icon: "▦", label: "My Classrooms" },
         { to: "/student/sessions", icon: "◇", label: "My Sessions" },
       ];
     }

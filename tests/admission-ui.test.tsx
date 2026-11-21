@@ -15,6 +15,7 @@ async function instructor(failure:number|null=null){
  let failed=!!failure,exists=failure!==404;const calls:string[]=[];
  const transport=vi.fn<typeof fetch>(async(input,init)=>{const path=String(input);calls.push(path);
   if(path.endsWith('/auth/login'))return json(tokens('Instructor'));
+  if(path.startsWith('/api/v1/sessions?'))return json({items:[],page:1,pageSize:25,totalCount:0});
   if(path.endsWith('/join-code/rotate')){failed=false;exists=true;return json({classroomId:'class-1',joinCode:'LIVE1234',active:true});}
   if(path.endsWith('/join-code'))return failed?json({title:failure===404?'classroom.join_code_missing':'Temporary failure',detail:failure===404?'Generate a class code to accept student requests.':'Please retry.',traceId:'trace-admission'},failure!):json({classroomId:'class-1',joinCode:'LIVE1234',active:true});
   if(path.endsWith('/roster')||path.endsWith('/join-requests'))return json([]);
