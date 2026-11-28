@@ -8,7 +8,7 @@ export function browserTokenVault(storage: Storage): TokenVault {
   return {
     read() { try { const v = JSON.parse(storage.getItem(key) || 'null'); return validTokens(v) ? v : null; } catch { return null; } },
     write(tokens) { storage.setItem(key, JSON.stringify(tokens)); },
-    clear() { storage.removeItem(key); },
+    clear() { storage.removeItem(key);for(let i=storage.length-1;i>=0;i--){const item=storage.key(i);if(item?.startsWith('simulation.quotation.v1:'))storage.removeItem(item);} },
   };
 }
 function validTokens(value: unknown): value is IssuedTokens {

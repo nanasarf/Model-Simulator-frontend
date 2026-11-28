@@ -47,6 +47,8 @@ export class ApiClient {
     if (response.status === 204) return undefined as T;
     return response.json() as Promise<T>;
   }
+  /** Authenticated raw JSON text for decimal-preserving protocol consumers. */
+  async text(path:string,options:RequestOptions={}) { return (await this.response(path,options)).text(); }
   async download(path: string, signal?: AbortSignal) { return (await this.response(path, { signal })).blob(); }
 }
 export const sessionExpired = () => new ApiProblem(401, 'about:blank', 'Sign in required', 'Your session expired. Sign in to continue.', 'authentication.invalid_token');

@@ -434,7 +434,7 @@ export function PublishedVersionPage() {
     <>
       <header className="page-heading">
         <Link to="/instructor/scenarios">Back to Scenarios</Link>
-        <p className="eyebrow scenario-status published">Ready to use</p>
+          <p className="eyebrow scenario-status published">Published</p>
         <h1>{v.title}</h1>
         <p>{modelLabel(v.modelIdentifier)}</p>
       </header>
@@ -444,6 +444,7 @@ export function PublishedVersionPage() {
           This published scenario is locked so simulations always use the
           version you prepared.
         </p>
+          {v.modelIdentifier==='Economics.CompetitiveMarket'&&v.modelVersion==='1.0.0'&&<p className="notice">For Paired Quotation Laboratory publications, D3 submission policy remains unresolved. Publication and launch eligibility do not establish classroom readiness. Multiple distinct quotations can block execution; no amendment or cancellation workflow is available.</p>}
         <p>Published {new Date(v.publishedAt).toLocaleDateString()}</p>
       </section>
 

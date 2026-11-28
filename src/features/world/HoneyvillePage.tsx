@@ -18,6 +18,7 @@ import { WorldBridge } from './bridge';
 import { PhaserWorld } from './PhaserWorld';
 import './world.css';
 import { createWorldConnection,WorldPresenceClient,type PresenceView } from './presence';
+import { PairedQuotationWorkspace } from '../competitive-market/PairedQuotationWorkspace';
 
 export const honeyville=parseHoneyville(rawMap);
 export default function HoneyvillePage(){const {sessionId=''}=useParams();return isSessionId(sessionId)?<AuthorizedWorld key={sessionId} id={sessionId}/>:<section className="state"><h1>Invalid session ID</h1><p>Open Honeyville from an authorized session.</p></section>;}
@@ -38,19 +39,19 @@ function AuthorizedWorld({id}:{id:string}){
     const live=new SessionConnection(hub,id,recover,recover,value=>{if(active){setConnection(value);setShellStatus(value);}},()=>{if(active){setConnection('disconnected');setShellStatus('disconnected');}});
     void live.start();return()=>{active=false;setShellStatus(null);hub.off('SessionAccessRevoked',revoke);void live.dispose().catch(()=>{});};
   },[api,auth,queries,uid,id,hasState,revoked,setShellStatus]);
-  const back=<Link className="button-link secondary" to={`/student/sessions/${id}`}>← Return to session</Link>;
+  const back=<div className="button-row"><Link className="button-link secondary" to={`/student/sessions/${id}`}>← Return to session</Link><Link className="button-link" to={`/student/sessions/${id}#academic-workspace`}>Open decision workspace</Link></div>;
   if(revoked||(state.error instanceof ApiProblem&&[401,403,404].includes(state.error.status))||(bootstrap.error instanceof ApiProblem&&[401,403,404].includes(bootstrap.error.status)))return <section className="state"><p className="eyebrow">Honeyville</p><h1>Session access unavailable</h1><p>Your permission to enter this world could not be confirmed. Your account’s classroom access is unchanged.</p>{back}</section>;
-  if(state.isPending)return <LoadingState label="Confirming session access"/>;
+  if(state.isPending)return <><LoadingState label="Confirming session access"/>{back}</>;
   if(state.isError||!state.data)return <><ErrorState error={state.error} retry={()=>void state.refetch()}/>{back}</>;
   const context=recoverContext(state.data,uid);
   if(['completed','terminated','deleted'].includes(context.status.toLowerCase()))return <section className="state"><h1>This session has ended</h1>{back}</section>;
   if(!context.participant||!context.teamId||!context.roleCodes.length||['draft','setup','lobby','created','ready'].includes(context.status.toLowerCase()))return <section className="state"><h1>Honeyville is waiting</h1><p>Join a team and role, then wait for your instructor to start this session.</p>{back}</section>;
-  if(bootstrap.isPending)return <LoadingState label="Recovering the world projection"/>;
+  if(bootstrap.isPending)return <><LoadingState label="Recovering the world projection"/>{back}</>;
   if(bootstrap.isError||!bootstrap.data)return <><ErrorState error={bootstrap.error} retry={()=>void bootstrap.refetch()}/>{back}</>;
-  return <HoneyvilleExperience key={`${id}:${team}`} bootstrap={bootstrap.data} round={context.roundNumber} phase={context.phase} role={context.roleCodes.join(', ')} status={context.status} connection={connection} onRefresh={()=>void bootstrap.refetch()} refreshing={bootstrap.isFetching} back={back}/>;
+  return <HoneyvilleExperience key={`${id}:${team}`} sessionId={id} bootstrap={bootstrap.data} round={context.roundNumber} phase={context.phase} role={context.roleCodes.join(', ')} status={context.status} connection={connection} onRefresh={()=>void bootstrap.refetch()} refreshing={bootstrap.isFetching} back={back}/>;
 }
 
-function HoneyvilleExperience({bootstrap,round,phase,role,status,connection,onRefresh,refreshing,back}:{bootstrap:WorldBootstrap;round:number;phase:string;role:string;status:string;connection:ConnectionStatus;onRefresh:()=>void;refreshing:boolean;back:React.ReactNode}){
+function HoneyvilleExperience({sessionId,bootstrap,round,phase,role,status,connection,onRefresh,refreshing,back}:{sessionId:string;bootstrap:WorldBootstrap;round:number;phase:string;role:string;status:string;connection:ConnectionStatus;onRefresh:()=>void;refreshing:boolean;back:React.ReactNode}){
   const {api,auth}=useRuntime();
   const [presence,setPresence]=useState<PresenceView>({status:'connecting',count:0,controlled:false});
   const presenceClient=useRef<WorldPresenceClient|null>(null);
@@ -87,6 +88,7 @@ function HoneyvilleExperience({bootstrap,round,phase,role,status,connection,onRe
       <div className="hv-interaction"><div><span className="hv-compass" aria-hidden="true">⌖</span><div><strong>{near?.label??'Explore the Nectar Commons'}</strong><small>{near?'You are within the information zone.':'Follow the paths to discover the six facilities.'}</small></div></div><button disabled={!near||!!panel||paused} onClick={()=>near&&setPanel(near.name)}>{near?'Inspect facility':'Approach a facility'} <kbd>E</kbd></button></div>
     </div>
     <aside className="hv-sidebar" aria-label="World guide"><p className="eyebrow">YOUR FIELD GUIDE</p><h2>One hive.<br/>Many perspectives.</h2><p className="hv-guide-copy">Walk the connected districts. Discover where your role meets the wider community.</p>
+      <button type="button" className="secondary" onClick={()=>setPanel('market.hall')}>Open Honey Market workspace</button><p className="muted">Academic access does not require movement, working map assets, or multiplayer presence.</p>
       <ol className="hv-facilities">{honeyville.facilities.map(f=><li key={f.name} className={nearby===f.name?'is-near':''}><span>{f.number}</span><div><strong>{f.label}</strong><small>{f.district}</small></div>{nearby===f.name&&<span className="hv-near-label">NEARBY</span>}</li>)}</ol>
       <div className="hv-controls"><p className="eyebrow">GETTING AROUND</p><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys</p><p><kbd>E</kbd> Inspect nearby facility</p><p><kbd>Tab</kbd> Navigate interface</p><small>Focus the map before moving. Exploring never submits a simulation decision.</small></div>
       <details className="hv-touch"><summary>On-screen movement controls</summary><div aria-label="Movement controls" className="hv-dpad">{[['↑',0,-1],['←',-1,0],['↓',0,1],['→',1,0]].map(([label,x,y])=><button key={label} aria-label={`Move ${label==='↑'?'north':label==='↓'?'south':label==='←'?'west':'east'}`} onPointerDown={event=>{event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);document.querySelector<HTMLCanvasElement>('.hv-canvas canvas')?.focus();bridge.emit('direction',{x:Number(x),y:Number(y)});}} onPointerUp={()=>bridge.emit('direction',{x:0,y:0})} onPointerCancel={()=>bridge.emit('direction',{x:0,y:0})} onBlur={()=>bridge.emit('direction',{x:0,y:0})}>{label}</button>)}</div></details>
@@ -95,8 +97,8 @@ function HoneyvilleExperience({bootstrap,round,phase,role,status,connection,onRe
     {facility&&<aside className="hv-panel" aria-labelledby="facility-title" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();dismiss();}}}>
       <div className="hv-panel-heading"><p className="eyebrow">{facility.district} / {facility.number}</p><button ref={close} type="button" className="secondary" aria-label="Close facility panel" onClick={dismiss}>✕</button></div>
       <img className="hv-panel-art" src={`${import.meta.env.BASE_URL}world/honeyville/${facility.prefab}.svg`} alt=""/><h2 id="facility-title">{facility.label}</h2><p>{facility.purpose}</p>
-      {facility.name==='market.hall'?<section className="hv-market-board" aria-labelledby="market-board-title"><div className="hv-board-title"><h3 id="market-board-title">Market board</h3><button className="text-button" onClick={onRefresh} disabled={refreshing}>{refreshing?'Updating…':'Refresh'}</button></div>
-        {market?.indicators.some(i=>i.key==='price')?<><dl>{market.indicators.filter(i=>['round','price','quantityExchanged','unmatchedDemand','unmatchedSupply'].includes(i.key)).map(i=><div key={i.key}><dt>{{round:'Result round',price:'Model-reported price',quantityExchanged:'Units exchanged',unmatchedDemand:'Unmatched demand',unmatchedSupply:'Unmatched supply'}[i.key]}</dt><dd>{i.value}</dd></div>)}</dl><p className="muted">Released team-level results. These figures do not establish your personal trade or contribution.</p></>:<p className="muted">No released market result is available. Your instructor controls when outcomes are calculated and released.</p>}</section>:<div className="hv-panel-note"><strong>Observe first.</strong><p>Information panels never submit decisions, grant permissions or change simulation outcomes.</p></div>}
+      {facility.name==='market.hall'?<PairedQuotationWorkspace sessionId={sessionId} teamId={bootstrap.snapshot?.teamId} legacy={<section className="hv-market-board" aria-labelledby="market-board-title"><div className="hv-board-title"><h3 id="market-board-title">Market board</h3><button className="text-button" onClick={onRefresh} disabled={refreshing}>{refreshing?'Updating…':'Refresh'}</button></div>
+        {market?.indicators.some(i=>i.key==='price')?<><dl>{market.indicators.filter(i=>['round','price','quantityExchanged','unmatchedDemand','unmatchedSupply'].includes(i.key)).map(i=><div key={i.key}><dt>{{round:'Result round',price:'Model-reported price',quantityExchanged:'Units exchanged',unmatchedDemand:'Unmatched demand',unmatchedSupply:'Unmatched supply'}[i.key]}</dt><dd>{i.value}</dd></div>)}</dl><p className="muted">Released team-level results. These figures do not establish your personal trade or contribution.</p></>:<p className="muted">No released market result is available. Your instructor controls when outcomes are calculated and released.</p>}</section>}/>:<div className="hv-panel-note"><strong>Observe first.</strong><p>Information panels never submit decisions, grant permissions or change simulation outcomes.</p></div>}
       <p className="hv-panel-back">Use “Return to session” for your authorized actions and instructor-led activity.</p>
     </aside>}
   </section>;

@@ -26,6 +26,7 @@ import type {
 import type { AuthoringIssue, ValidationReport } from "../../types/scenarios";
 import { LinesField, NumberField, TextField } from "./fields";
 import { macroAuthoring, marketAuthoring, type EditDraft } from "./service";
+import { WorldBindingEditor } from '../competitive-market/WorldBindingEditor';
 
 type Model = "macro" | "market";
 type AnyDraft = MacroDraft | CompetitiveMarketDraft;
@@ -492,6 +493,7 @@ function simulationSummary(
 
   const market = content as CompetitiveMarketScenarioContent;
   const roleCount = market.roles.filter((r) => r.enabled).length;
+  if(market.pairedQuotationLaboratory)return [`${market.maximumRounds} decision period`,`${roleCount} supported roles per independent team market`,'Installed paired quotation mechanism',market.world?'World binding selected; backend validation required':'No world binding selected',`${market.learningObjectives.length} learning goals`,'D3 unresolved — classroom pilot blocked'];
   return [
     `${market.maximumRounds} rounds`,
     `${roleCount} players`,
@@ -747,6 +749,8 @@ export function ScenarioEditorPage() {
         </section>
       )}
 
+      {selected==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory&&<p className="notice" role="status">Paired Quotation Laboratory: D3 opportunities/revisions remain unresolved. Successful validation or publication does not establish classroom readiness. No welfare, policy experiment, personal settlement, or competitive-equilibrium claim is supported.</p>}
+
       <div className="authoring-layout scenario-builder-layout">
         <nav
           className="step-nav scenario-builder-nav"
@@ -800,7 +804,7 @@ export function ScenarioEditorPage() {
               />
             )}
 
-            {step === "rules" && (
+            {step === "rules" && selected==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory ? <p className="notice">The paired laboratory uses the installed model mechanism. Policy, shocks, invented economic rules and welfare assessment are outside its supported scope.</p> : step==='rules'&& (
               <RuleBuilder
                 model={selected}
                 rules={rules}
@@ -811,7 +815,9 @@ export function ScenarioEditorPage() {
               />
             )}
 
-            {step === "world" && (
+            {step==='world'&&selected==='market'&&<WorldBindingEditor value={content as CompetitiveMarketScenarioContent} onChange={updateContent}/>}
+            {step==='world'&&selected==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory&&<section className="card"><h3>Laboratory configuration</h3><p>One decision period; one configured buyer and seller with one synthetic unit each. No policy experiments or scheduled shocks. These configured units do not change native submitted-quantity bounds.</p><div className="form-grid columns-2">{(['demandIntercept','supplyIntercept','demandSlope','supplySlope'] as const).map(field=><NumberField key={field} id={`lab-${field}`} label={field.replace(/([A-Z])/g,' $1')} value={(content as CompetitiveMarketScenarioContent).configuration[field]} onChange={next=>{const current=content as CompetitiveMarketScenarioContent;updateContent({...current,configuration:{...current.configuration,[field]:next}});}}/>)}</div></section>}
+            {step === "world" && !(selected==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory) && (
               <WorldSetupEditor
                 model={selected}
                 content={content}
@@ -896,6 +902,7 @@ export function ScenarioEditorPage() {
           </div>
 
           {save.error && <ErrorState error={save.error} />}
+          {step!=='review'&&(validate.error||publish.error)&&<ErrorState error={validate.error||publish.error}/>}
           {archive.error && <ErrorState error={archive.error} />}
           {duplicate.error && <ErrorState error={duplicate.error} />}
 
@@ -968,6 +975,7 @@ function ScenarioStoryEditor({
       </label>
       <select
         id="builder-rounds"
+        disabled={model==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory===true}
         value={rounds}
         onChange={(event) => {
           const value = Number(event.target.value);
@@ -984,7 +992,7 @@ function ScenarioStoryEditor({
           }
         }}
       >
-        {[4, 5, 6, 7, 8, 9, 10].map((count) => (
+        {[...new Set([rounds,...(model==='market'?[1]:[]),4, 5, 6, 7, 8, 9, 10])].sort((a,b)=>a-b).map((count) => (
           <option key={count} value={count}>
             {count} rounds
           </option>
@@ -1019,6 +1027,11 @@ function PlayersAndDecisionsEditor({
     model === "macro"
       ? buildMacroRoles(content as MacroScenarioContent)
       : buildMarketRoles(content as CompetitiveMarketScenarioContent);
+
+  if(model==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory){
+    const market=content as CompetitiveMarketScenarioContent;
+    return <div className="form-grid"><h3>Buyer and seller role objectives</h3><p>The backend laboratory template supplies the supported roles and quotation actions. Each team has one buyer and one seller. Objectives and disclosure settings are frozen at publication.</p>{market.roles.map(role=><section className="card" key={role.code}><h4>{role.code}</h4><LinesField id={`lab-objectives-${role.code}`} label={`${role.code} role objectives`} value={role.objectives} onChange={objectives=>onChange({...market,roles:market.roles.map(r=>r.code===role.code?{...r,objectives}:r)})}/><label className="check-field"><input type="checkbox" checked={role.seePrivateInformation} onChange={event=>onChange({...market,roles:market.roles.map(r=>r.code===role.code?{...r,seePrivateInformation:event.target.checked}:r)})}/><span>{role.code}: show own-side schedule</span></label></section>)}<p>Supported actions: {(market.enabledActions??[]).join(', ')}. No government, policy, shock, or scoring role is introduced.</p></div>;
+  }
 
   const updateRole = (updated: BuilderRole) => {
     if (model === "macro") {
@@ -2095,6 +2108,8 @@ function LearningGoalEditor({
   const market = content as CompetitiveMarketScenarioContent;
   const selectedAssessments = market.assessmentDimensions ?? [];
 
+  if(market.pairedQuotationLaboratory)return <div className="form-grid"><h3>Laboratory learning and discussion</h3><LinesField id="lab-learning" label="Learning goals" value={market.learningObjectives} onChange={learningObjectives=>onChange({...market,learningObjectives})}/><LinesField id="lab-discussion" label="Discussion prompts" value={market.discussionPrompts} onChange={discussionPrompts=>onChange({...market,discussionPrompts})}/><LinesField id="lab-debrief" label="Debrief prompts" value={market.debriefPrompts} onChange={debriefPrompts=>onChange({...market,debriefPrompts})}/><p>Individual reasoning assessment, welfare evaluation and scoring are not implemented by this laboratory.</p></div>;
+
   return (
     <div className="form-grid">
       <h3>What should students learn from this scenario?</h3>
@@ -2199,7 +2214,7 @@ function ScenarioReview({
 
         {validation && blockers === 0 && (
           <>
-            <p className="status-text">Everything looks ready.</p>
+            <p className="status-text">{model==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory?'No publication blockers reported. D3 remains unresolved; this is not classroom-pilot approval.':'Everything looks ready.'}</p>
             <ul>
               <li>Every role has at least one decision</li>
               <li>Game rules are valid</li>
@@ -2231,6 +2246,7 @@ function ScenarioReview({
             </ul>
           </>
         )}
+        {!!validation?.warnings.length&&<section aria-label="Publication warnings"><h4>Backend publication warnings</h4><ul>{validation.warnings.map((warning,index)=><li key={`${warning.code}:${index}`}>{warning.message} <small>({warning.code})</small></li>)}</ul></section>}
       </section>
 
       <section className="card">
@@ -2289,6 +2305,7 @@ function PreviewSummary({
   model: Model;
   content: AnyContent;
 }) {
+  if(model==='market'&&(content as CompetitiveMarketScenarioContent).pairedQuotationLaboratory)return <section className="preview"><h4>Laboratory authoring preview</h4><p>This preview is not a learner-submitted laboratory outcome. It uses configured model inputs and does not establish equilibrium, personal profit, or validated welfare. Use a launched session and explicitly released workspace results for the actual experiment. D3 remains unresolved.</p></section>;
   if ("quarters" in preview) {
     const first = preview.quarters[0]?.state;
     const last = preview.quarters[preview.quarters.length - 1]?.state;

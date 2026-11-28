@@ -19,6 +19,7 @@ async function fixtures(page:Page,options:Options={}){
     const response=(body:unknown,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
     if(url.pathname.endsWith('/auth/refresh'))return response(tokens);
     if(url.pathname.endsWith('/auth/me'))return response({id:USER,email:'student@example.test',platformRoles:[role]});
+    if(url.pathname.endsWith('/workspace'))return response({title:'market.lab_required',errorCode:'market.lab_required',detail:'Legacy exploration-only fixture.'},422);
     if(options.denied&&url.pathname.includes('/sessions/'))return response({title:'session.not_found',detail:'Session was not found.'},404);
     if(url.pathname.endsWith('/state'))return response({sessionId:id,status:options.sessionStatus??'Running',phase:'Results',roundNumber:2,teamId:TEAM,modelIdentifier:'Economics.CompetitiveMarket',modelVersion:'1.0.0',roleAssignments:[{assignmentId:'66666666-6666-6666-6666-666666666666',teamId:TEAM,roleCode:'BUYER',capabilities:['MARKET_SUBMIT_BID']}],availableActions:[],currentRoundSubmissions:[],visibleState:null,version:12,participants:[{userId:USER,teamId:TEAM,isReady:true,roles:['BUYER']}]});
     if(url.pathname.endsWith('/world/bootstrap'))return response({protocolVersion:1,status:options.status??'ready',snapshot:options.status&&options.status!=='ready'?null:{schemaVersion:1,sessionId:id,teamId:TEAM,sourceStamp:'b'.repeat(64),contentHash:'a'.repeat(64),binding:{templateId:meta.projectionTemplateId,templateVersion:meta.projectionTemplateVersion,templateHash:meta.projectionTemplateHash,projectorId:meta.projectorId,projectorVersion:meta.projectorVersion,schemaVersion:1},regions:[{id:'town',x:0,y:0,width:2048,height:1536}],entities:[{id:'market.hall',kind:'building',regionId:'town',transform:{x:768,y:640,rotation:0},visual:{prefabKey:'market-board',variantKey:'default'},indicators:[{key:'round',value:'2',unitKey:'round'},{key:'price',value:'73.125',unitKey:'model-price'},{key:'quantityExchanged',value:'12',unitKey:'units'}]}]}});
@@ -64,11 +65,16 @@ test('a student explores a real map, inspects facilities and sees only supplied 
   await page.getByRole('link',{name:'Return to session'}).click();await expect(page.getByRole('heading',{name:'Simulation session',exact:true})).toBeVisible();await expect(page.locator('canvas')).toHaveCount(0);
 });
 test('building and perimeter collisions constrain movement without hijacking interface focus',async({page})=>{
+  // Several full-map walks exceed 60s under software rendering. Keep each
+  // moveTo deadline and all geometry assertions; allow their cumulative duration.
+  test.setTimeout(120_000);
   await fixtures(page);await page.goto(path());await ready(page);await market(page);await page.getByRole('button',{name:'Close facility panel'}).click();
   await move(page,'w',1600);const first=await position(page);expect(first.y).toBeGreaterThan(638);await move(page,'w',700);expect(Math.abs((await position(page)).y-first.y)).toBeLessThan(2);
   // Multiplayer snapshots can retain the accepted market position across a refresh.
   // Return to the clear central path before approaching the north perimeter.
-  await moveTo(page,'y',900,'s');await moveTo(page,'x',1008,'d');await moveTo(page,'y',50,'w');expect((await position(page)).y).toBeGreaterThan(32);expect((await position(page)).y).toBeLessThan(55);
+  await moveTo(page,'y',900,'s');await moveTo(page,'x',1008,'d');
+  // Preserve 20s per movement leg with a clear-path waypoint for the 850px walk.
+  await moveTo(page,'y',500,'w');await moveTo(page,'y',50,'w');expect((await position(page)).y).toBeGreaterThan(32);expect((await position(page)).y).toBeLessThan(55);
   await page.getByRole('link',{name:'Return to session'}).focus();const p=await position(page);await page.keyboard.press('ArrowDown');await page.waitForTimeout(200);expect(await position(page)).toEqual(p);
 });
 test('SPA navigation destroys the previous scene and creates one fresh session-local instance',async({page})=>{

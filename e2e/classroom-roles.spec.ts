@@ -23,6 +23,7 @@ test('classroom members enter a session, choose a role, and receive an instructo
       const respond=(value:unknown,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(value)});
       if(path.endsWith('/auth/refresh'))return respond(tokens);
       if(path.endsWith('/auth/me'))return respond({id:userId,email:instructor?'professor@example.test':'alice@example.test',platformRoles:[platformRole]});
+      if(path.endsWith('/workspace'))return respond({title:'market.lab_required',errorCode:'market.lab_required'},422);
       if(path.endsWith('/me/classrooms'))return respond([{classroomId:CLASSROOM,name:'Economics 101',enrolledAt:new Date().toISOString()}]);
       if(path.endsWith('/me/sessions'))return respond([]);
       if(path===`/api/v1/classrooms/${CLASSROOM}`)return respond({classroomId:CLASSROOM,name:'Economics 101',courseId:'course-1',courseCode:'ECON101',courseName:'Economics'});

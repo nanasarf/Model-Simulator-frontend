@@ -1,6 +1,7 @@
 // Source snapshot. Serializer-reviewed numeric assessment enums intentionally differ from handoff.
 import type { ScenarioDraftDocument } from './scenarios';
 import type { SubmissionInspection, HistoryItem } from './sessions';
+import type { WorldBinding } from '../features/competitive-market/paired-quotation-contracts';
 
 // src/SimulationPlatform.Simulations.Economics/CompetitiveMarket/CompetitiveMarketTypes.cs
 export interface MarketConfiguration {
@@ -104,6 +105,10 @@ export interface CompetitiveMarketRole {
 
 // src/SimulationPlatform.Simulations.Economics/CompetitiveMarket/CompetitiveMarketAuthoring.cs
 export interface CompetitiveMarketScenarioContent {
+  world?: WorldBinding | null;
+  pairedQuotationLaboratory?: boolean;
+  /** Omitted/null retains the existing gameplay policy. Policy 2 is opt-in. */
+  gameplayPolicyVersion?: 1 | 2 | null;
   briefing: string;
   learningObjectives: Array<string>;
   discussionPrompts: Array<string>;
